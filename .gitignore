@@ -1,0 +1,52 @@
+#ignore binary files
+**/*.o
+**/moc_*.*
+**/qrc_*.*
+**/Makefile
+**/*pro.user
+**/*.autosave
+**/*.sln
+**/*.sdf
+**/*.user
+**/*vcxproj*
+**/*~
+**/*.swp
+**/*.suo
+**/*.pdb
+**/*.obj
+**/*.Debug
+**/ipch
+**/*.Release
+**/*.tlog
+**/*.manifest
+bin/*
+bin_msvc/*
+bin_old/*
+v3d_main/v3d/release/*
+v3d_main/v3d/debug/*
+.project
+.cproject
+.settings
+CMakeFiles/*
+
+#ignore MacOS system files
+.DS_Store
+
+#ignore lib files or header files in common_lib
+v3d_main/common_lib/*
+
+#ignore symlink folder
+released_plugins_more
+
+#ignore the following binary files
+v3d_main/jba/c++/libv3dnewmat.a
+v3d_main/v3d/vaa3d64.app/
+v3d_main/v3d/vaa3d
+
+#ignore cmake build directories
+build_linux-*/
+build_macosx-*/
+build_windows-*/
+
+v3d_main/v3d_build/
+v3d_main/build-v3d_qt6-Desktop_Qt_6_1_1_MinGW_64_bit-Release
