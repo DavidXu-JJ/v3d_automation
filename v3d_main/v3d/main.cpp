@@ -165,13 +165,14 @@ void crop_ans_swc(const QString& input_file,const int &X,const int &Y,const int 
 }
 
 
-QVector<std::pair<NeuronSWC,XYZ> > Find_Border(const NeuronTree & App2_Tree,const int & blocksize){
-    QMap<int,QVector<int> > son;
-    QMap<int,NeuronSWC> mp;
-    for(const NeuronSWC & swc:App2_Tree.listNeuron){
-        son[swc.pn].push_back(swc.n);
-        mp[swc.n]=swc;
-    }
+QVector<std::pair<NeuronSWC,QQueue<XYZ> > > Find_Border(const NeuronTree & App2_Tree,const int & blocksize,const QMap<int,QVector<int> > & son, const QMap<int,NeuronSWC> & mp){
+//    QMap<int,QVector<int> > son;
+//    QMap<int,NeuronSWC> mp;
+//    for(const NeuronSWC & swc:App2_Tree.listNeuron){
+//        son[swc.pn].push_back(swc.n);
+//        mp[swc.n]=swc;
+//    }
+    const int compacity=4;
     QVector<std::pair<int,QQueue<XYZ> > > border;
     QQueue<std::pair<int,QQueue<XYZ> > > q;
     q.push_back(std::make_pair(son[-1][0],QQueue<XYZ>() ) );
@@ -183,7 +184,7 @@ QVector<std::pair<NeuronSWC,XYZ> > Find_Border(const NeuronTree & App2_Tree,cons
         for(const int & to:son[now_id]){
             QQueue nex_queue=now.second;
             const NeuronSWC & nex_swc=mp[to];
-            if(nex_queue.size()>=3){
+            if(nex_queue.size()>=compacity){
                 nex_queue.pop_front();
             }
             nex_queue.push_back(XYZ(nex_swc.x-now_swc.x,nex_swc.y-now_swc.y,nex_swc.z-now_swc.z));
@@ -194,7 +195,7 @@ QVector<std::pair<NeuronSWC,XYZ> > Find_Border(const NeuronTree & App2_Tree,cons
             }
         }
     }
-    QVector<std::pair<NeuronSWC,XYZ> > ret;
+    QVector<std::pair<NeuronSWC,QQueue<XYZ> > > ret;
     for(const std::pair<int,QQueue<XYZ> >  & i:border){
         const int & id=i.first;
         const XYZ & point=mp[id];
@@ -207,18 +208,8 @@ QVector<std::pair<NeuronSWC,XYZ> > Find_Border(const NeuronTree & App2_Tree,cons
 
         if(mn>10) continue;
 
-        XYZ mean=XYZ(0,0,0);
-        for(const XYZ & j:i.second){
-            mean=mean+j;
-        }
-        int sz=i.second.size();
-        mean=mean/XYZ(1.0/sz,1.0/sz,1.0/sz);
-        ret.push_back(std::make_pair(mp[id],mean));
+        ret.push_back(std::make_pair(mp[id],i.second));
 
-
-//        for(auto j:i.second){
-//            qDebug()<<"vec:"<<j.x<<" "<<j.y<<" "<<j.z;
-//        }
     }
     qDebug()<<"Border_Finish";
     return ret;
@@ -259,7 +250,7 @@ QString generate_swc_name(const std::string & path,const CellAPO &centerAPO){
 
 QString Res_Path="G:/18454/RES(26298x35000x11041)";
 QString Vaa3d_App_Path="C:/3.603c";
-QString Work_Dir="G:/work_dir";
+QString Work_Dir="G:/work_dir_trim";
 
 QProcess p;
 
@@ -313,6 +304,36 @@ void DFS(const CellAPO & centerAPO,const ImageMarker & startPoint,const int &blo
     NeuronTree App2_Tree=readSWC_file(App2_Eswc_File_Name);
     if(App2_Tree.listNeuron.empty()) return;
 
+
+
+
+
+    //find_border_point
+    QMap<int,QVector<int> > son;
+    QMap<int,NeuronSWC> mp;
+    for(const NeuronSWC & swc:App2_Tree.listNeuron){
+        son[swc.pn].push_back(swc.n);
+        mp[swc.n]=swc;
+    }
+    QVector<std::pair<NeuronSWC,QQueue<XYZ> > > Border_Point_Vector=Find_Border(App2_Tree,blocksize,son,mp);
+
+    //cut the border
+    QVector<int> need_cut;
+    for(int i=App2_Tree.listNeuron.size()-1;i>=0;i--){
+        for(const std::pair<NeuronSWC,QQueue<XYZ> > & unsecure_point_vector:Border_Point_Vector){
+            const NeuronSWC & unsecure_point=unsecure_point_vector.first;
+            if(App2_Tree.listNeuron[i]==unsecure_point){
+                need_cut.push_back(i);
+                break;
+            }
+        }
+
+    }
+    for(const int & i:need_cut){
+        App2_Tree.listNeuron.erase(App2_Tree.listNeuron.begin()+i);
+    }
+
+    //save swc
     V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(App2_Tree);
 
     for(const V_NeuronSWC & Seg:Segments.seg){
@@ -325,27 +346,34 @@ void DFS(const CellAPO & centerAPO,const ImageMarker & startPoint,const int &blo
         App2_Generate.append(Add_Seg);
     }
 
-    //find_border_point
-
-    QVector<std::pair<NeuronSWC,XYZ> > Border_Point_Vector=Find_Border(App2_Tree,blocksize);
 
 //    for(auto i:Border_Point_Vector){
 //        qDebug()<<i.first.n;
 //        qDebug()<<"vec:"<<i.second.x<<" "<<i.second.y<<" "<<i.second.z;
 //    }
 
-    for(const std::pair<NeuronSWC,XYZ> & border:Border_Point_Vector){
-        const NeuronSWC & Border_Point=border.first;
-        const XYZ & Vector=border.second;
-        int direction=Judge_Direction(Vector);
+
+
+    for(std::pair<NeuronSWC,QQueue<XYZ> > & unsecure:Border_Point_Vector){
+        const NeuronSWC & Border_Point=mp[unsecure.first.pn];
+        QQueue<XYZ> & Vectors=unsecure.second;
+        Vectors.pop_back();
+        XYZ mean=XYZ(0.0,0.0,0.0);
+        for(const XYZ & i:Vectors){
+            mean=mean+i;
+        }
+        int sz=Vectors.size();
+        mean=mean/XYZ(sz);
+
+        int direction=Judge_Direction(mean);
         CellAPO New_Point;
         int offset=blocksize/2-2;
-        New_Point.x=centerAPO.x-blocksize/2+Border_Point.x;
-        New_Point.y=centerAPO.y-blocksize/2+Border_Point.y;
-        New_Point.z=centerAPO.z-blocksize/2+Border_Point.z;
-        New_Point.x+=dx[direction]*offset;
-        New_Point.y+=dy[direction]*offset;
-        New_Point.z+=dz[direction]*offset;
+        New_Point.x=int(centerAPO.x-blocksize/2+Border_Point.x+0.5);
+        New_Point.y=int(centerAPO.y-blocksize/2+Border_Point.y+0.5);
+        New_Point.z=int(centerAPO.z-blocksize/2+Border_Point.z+0.5);
+        New_Point.x+=int(dx[direction]*offset+0.5);
+        New_Point.y+=int(dy[direction]*offset+0.5);
+        New_Point.z+=int(dz[direction]*offset+0.5);
         ImageMarker New_Marker;
         New_Marker.x=blocksize/2-dx[direction]*offset;
         New_Marker.y=blocksize/2-dy[direction]*offset;
