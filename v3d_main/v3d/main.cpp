@@ -114,6 +114,17 @@ void printHelp_v3d()
     return;
 }
 
+struct node{
+    int x,y,z,marker_x,marker_y,marker_z;
+    node(int x_,int y_,int z_,int marker_x_,int marker_y_,int marker_z_):x(x_),y(y_),z(z_),marker_x(marker_x_),marker_y(marker_y_),marker_z(marker_z_){}
+    bool operator == (const node & cmp) const{
+        return (x==cmp.x)&&(y==cmp.y)&&(z==cmp.z)&&(marker_x==cmp.marker_x)&&(marker_y==cmp.marker_y)&&(marker_z==cmp.marker_z);
+    }
+    bool operator < (const node & cmp) const{
+        return x<cmp.x;
+    }
+};
+
 double distance_square(const NeuronSWC & point_a,const NeuronSWC & point_b){
     return (point_a.x-point_b.x)*(point_a.x-point_b.x)+(point_a.y-point_b.y)*(point_a.y-point_b.y)+(point_a.z-point_b.z)*(point_a.z-point_b.z);
 }
@@ -188,10 +199,12 @@ QVector<std::pair<NeuronSWC,XYZ> > Find_Border(const NeuronTree & App2_Tree,cons
         const int & id=i.first;
         const XYZ & point=mp[id];
 
-        qDebug()<<i.first<<" "<<mp[i.first].x<<" "<<mp[i.first].y<<" "<<mp[i.first].z;
+//        qDebug()<<i.first<<" "<<mp[i.first].x<<" "<<mp[i.first].y<<" "<<mp[i.first].z;
 
         int mn=std::min({point.x,abs(blocksize-point.x),point.y,abs(blocksize-point.y),point.z,abs(blocksize-point.z)});
-        qDebug()<<mn;
+
+//        qDebug()<<mn;
+
         if(mn>10) continue;
 
         XYZ mean=XYZ(0,0,0);
@@ -203,9 +216,9 @@ QVector<std::pair<NeuronSWC,XYZ> > Find_Border(const NeuronTree & App2_Tree,cons
         ret.push_back(std::make_pair(mp[id],mean));
 
 
-        for(auto j:i.second){
-            qDebug()<<"vec:"<<j.x<<" "<<j.y<<" "<<j.z;
-        }
+//        for(auto j:i.second){
+//            qDebug()<<"vec:"<<j.x<<" "<<j.y<<" "<<j.z;
+//        }
     }
     qDebug()<<"Border_Finish";
     return ret;
@@ -253,11 +266,14 @@ QProcess p;
 int dx[6]={1,-1,0,0,0,0};    //i=0 or 1,x= 0 or blocksize
 int dy[6]={0,0,1,-1,0,0};
 int dz[6]={0,0,0,0,1,-1};
+QMap<node,bool> vis;
 
 const int X=14530,Y=10693,Z=3124;
 
-void DFS(const CellAPO & centerAPO,const ImageMarker & startPoint,const int &blocksize,V_NeuronSWC_list & App2_Generate,int & offset){
+void DFS(const CellAPO & centerAPO,const ImageMarker & startPoint,const int &blocksize,V_NeuronSWC_list & App2_Generate){
     //load file
+    node now=node(centerAPO.x,centerAPO.y,centerAPO.z,startPoint.x,startPoint.y,startPoint.z);
+    if(vis.count(now)) return;
     QList<CellAPO> List_APO_Write;
     List_APO_Write.push_back(centerAPO);
     QString APO_File_Name=generate_apo_name(Work_Dir.toStdString()+"/APOFile",centerAPO);	//make file in ./APOFile/xxx.000_xxx.000_xxx.000.apo
@@ -292,8 +308,8 @@ void DFS(const CellAPO & centerAPO,const ImageMarker & startPoint,const int &blo
           <<"/f"<<"app2"<<"/p"<<Marker_File_Name<<QString::number(0)<<QString::number(-1)
           <<"/i"<< QString(Work_Dir+QString("/testV3draw/thres_")+rawFileName)<<"/o"<<App2_Eswc_File_Name);
 
+    vis[now]=true;
     //addpoint
-    int Max_N=0;
     NeuronTree App2_Tree=readSWC_file(App2_Eswc_File_Name);
     if(App2_Tree.listNeuron.empty()) return;
 
@@ -308,33 +324,33 @@ void DFS(const CellAPO & centerAPO,const ImageMarker & startPoint,const int &blo
         }
         App2_Generate.append(Add_Seg);
     }
-    offset=Max_N;
 
     //find_border_point
 
     QVector<std::pair<NeuronSWC,XYZ> > Border_Point_Vector=Find_Border(App2_Tree,blocksize);
 
-    for(auto i:Border_Point_Vector){
-        qDebug()<<i.first.n;
-        qDebug()<<"vec:"<<i.second.x<<" "<<i.second.y<<" "<<i.second.z;
-    }
+//    for(auto i:Border_Point_Vector){
+//        qDebug()<<i.first.n;
+//        qDebug()<<"vec:"<<i.second.x<<" "<<i.second.y<<" "<<i.second.z;
+//    }
 
     for(const std::pair<NeuronSWC,XYZ> & border:Border_Point_Vector){
         const NeuronSWC & Border_Point=border.first;
         const XYZ & Vector=border.second;
         int direction=Judge_Direction(Vector);
         CellAPO New_Point;
+        int offset=blocksize/2-2;
         New_Point.x=centerAPO.x-blocksize/2+Border_Point.x;
         New_Point.y=centerAPO.y-blocksize/2+Border_Point.y;
         New_Point.z=centerAPO.z-blocksize/2+Border_Point.z;
-        New_Point.x+=dx[direction]*blocksize/2;
-        New_Point.y+=dy[direction]*blocksize/2;
-        New_Point.z+=dz[direction]*blocksize/2;
+        New_Point.x+=dx[direction]*offset;
+        New_Point.y+=dy[direction]*offset;
+        New_Point.z+=dz[direction]*offset;
         ImageMarker New_Marker;
-        New_Marker.x=blocksize/2-dx[direction]*blocksize/2;
-        New_Marker.y=blocksize/2-dy[direction]*blocksize/2;
-        New_Marker.z=blocksize/2-dz[direction]*blocksize/2;
-        DFS(New_Point,New_Marker,blocksize,App2_Generate,offset);
+        New_Marker.x=blocksize/2-dx[direction]*offset;
+        New_Marker.y=blocksize/2-dy[direction]*offset;
+        New_Marker.z=blocksize/2-dz[direction]*offset;
+        DFS(New_Point,New_Marker,blocksize,App2_Generate);
     }
 
 }
@@ -351,8 +367,7 @@ void App2_DFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
     startPoint.z=blocksize/2;
 
     V_NeuronSWC_list App2_Generate;
-    int offset=0;
-    DFS(centerAPO,startPoint,blocksize,App2_Generate,offset);
+    DFS(centerAPO,startPoint,blocksize,App2_Generate);
 
     NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
 
