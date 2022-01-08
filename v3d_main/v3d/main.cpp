@@ -269,7 +269,7 @@ QVector<NeuronSWC> used_swc;
 
 const int X=14530,Y=10693,Z=3124;
 
-void DFS(const CellAPO & centerAPO,const ImageMarker & startPoint,const int &blocksize,V_NeuronSWC_list & App2_Generate){
+void DFS(const CellAPO & centerAPO,ImageMarker & startPoint,const int &blocksize,V_NeuronSWC_list & App2_Generate){
 //    if(dep==3) return;
 
     node now=node(centerAPO.x,centerAPO.y,centerAPO.z,startPoint.x,startPoint.y,startPoint.z);
@@ -284,6 +284,11 @@ void DFS(const CellAPO & centerAPO,const ImageMarker & startPoint,const int &blo
     //drop marker file(ok)
     QList<ImageMarker> List_Marker_Write;
     List_Marker_Write.push_back(startPoint);
+    //Marker is changed to absolute location
+    //location transform has been checked(ok)
+    startPoint.x+=centerAPO.x-blocksize/2;
+    startPoint.y+=centerAPO.y-blocksize/2;
+    startPoint.z+=centerAPO.z-blocksize/2;
     QString Marker_File_Name=generate_marker_name(Work_Dir.toStdString()+"/MarkerFile",startPoint);	//make file in ./MarkerFile/xxx.000_xxx.000_xxx.000.marker
     writeMarker_file(Marker_File_Name,List_Marker_Write);
 
@@ -362,10 +367,10 @@ void DFS(const CellAPO & centerAPO,const ImageMarker & startPoint,const int &blo
 
     //check if border is identical to last marker
     NeuronSWC Start_Marker_Location;
-    //location transform has been checked(ok)
-    Start_Marker_Location.x=centerAPO.x-blocksize/2+startPoint.x;
-    Start_Marker_Location.y=centerAPO.y-blocksize/2+startPoint.y;
-    Start_Marker_Location.z=centerAPO.z-blocksize/2+startPoint.z;
+    //marker has been changed to absolute location
+    Start_Marker_Location.x=startPoint.x;
+    Start_Marker_Location.y=startPoint.y;
+    Start_Marker_Location.z=startPoint.z;
     used_swc.push_back(Start_Marker_Location);
 
     //if the square of distance between used_swc and new_border_point is lower than identical_threshold, don't search it
