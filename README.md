@@ -101,7 +101,7 @@ double Vector_Angle(const XYZ & a,const XYZ & b){
 
 ```
 
-## File relative
+## File related
 
 ```c++
 void Drop_NeuronSWC(const QString &path,const QList<NeuronSWC> & output){
