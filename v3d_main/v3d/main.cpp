@@ -1545,7 +1545,7 @@ int main(int argc, char **argv)
 {
 
 
-    const int blocksize=256;
+    const int blocksize=512;
     vis.clear();
     App2_non_recursive_DFS(X,Y,Z,blocksize,"./",Answer_File);
 
