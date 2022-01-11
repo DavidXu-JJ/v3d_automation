@@ -144,7 +144,7 @@ struct node{
 
 QString Res_Path="G:/18454/RES(26298x35000x11041)";
 QString Vaa3d_App_Path="C:/3.603c";
-QString Work_Dir="G:/work_dir_debug";
+QString Work_Dir="G:/work_dir_stackoverflow_128";
 QString Answer_File="G:/18454_answer/whole_image.eswc";
 QMap<int,QVector<int> > Answer_Graph;
 QMap<int,NeuronSWC> Answer_Map;
@@ -564,7 +564,7 @@ void DFS(const int & depth, const CellAPO & centerAPO,ImageMarker & startPoint,c
    Absolute_Marker.x+=centerAPO.x-blocksize/2;
    Absolute_Marker.y+=centerAPO.y-blocksize/2;
    Absolute_Marker.z+=centerAPO.z-blocksize/2;
-   QString Marker_File_Name=generate_marker_name(Work_Dir.toStdString()+"/MarkerFile",startPoint);	//make file in ./MarkerFile/xxx.000_xxx.000_xxx.000.marker
+   QString Marker_File_Name=generate_marker_name(Work_Dir.toStdString()+"/MarkerFile",Absolute_Marker);	//make file in ./MarkerFile/xxx.000_xxx.000_xxx.000.marker
    writeMarker_file(Marker_File_Name,List_Marker_Write);
 
    QString rawFileName=QString("%1.000_%2.000_%3.000.v3draw").arg(centerAPO.x).arg(centerAPO.y).arg(centerAPO.z);
@@ -884,7 +884,7 @@ int main(int argc, char **argv)
 {
 
 
-    const int blocksize=256;
+    const int blocksize=128;
     App2_DFS(X,Y,Z,blocksize,"./",Answer_File);
 
 
