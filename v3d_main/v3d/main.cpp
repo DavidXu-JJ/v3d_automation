@@ -919,7 +919,7 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
         qDebug()<<"start BFS,center_id="<<center_id;
 
         node now_node=node(centerAPO.x,centerAPO.y,centerAPO.z,startPoint.x,startPoint.y,startPoint.z);
-        if(vis.count(now_node)) return;
+        if(vis.count(now_node)) continue;
 
         //drop apo file(ok)
         QList<CellAPO> List_APO_Write;
@@ -971,10 +971,10 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
        NeuronTree App2_Tree=readSWC_file(App2_Eswc_File_Name);
        NeuronTree Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize);
        bool use_answer_find_border=false;
-       if(Answer_Tree.listNeuron.empty()) return;
+       if(Answer_Tree.listNeuron.empty()) continue;
        if(App2_Tree.listNeuron.empty()){
            if(Answer_Tree.listNeuron.empty()){
-               return;
+               continue;
            } else{
                use_answer_find_border=true;
            }
@@ -1016,7 +1016,7 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
            qDebug()<<"cut ok";
            //(new)
            if(center_id>0){
-               if(Answer_Tree.listNeuron.empty()) return;
+               if(Answer_Tree.listNeuron.empty()) continue;
                V_NeuronSWC_list V_Answer_Tree = NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
                //app2 is not accurate
                if(!Check_Tree_Identical(App2_Tree,V_Answer_Tree)){
@@ -1067,7 +1067,7 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
 
            qDebug()<<"Border_Point.size()"<<Border_Points.size();
 
-           if(Border_Points.empty()) return;
+           if(Border_Points.empty()) continue;
 
            for(const NeuronSWC & Border_Point:Border_Points){//absolute
                bool used=false;
@@ -1243,10 +1243,10 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
         int center_id=now.center_id;
         if(has_extend.count(center_id)) continue;
 
-        qDebug()<<"start BFS,center_id="<<center_id;
+        qDebug()<<"start DFS,center_id="<<center_id;
 
         node now_node=node(centerAPO.x,centerAPO.y,centerAPO.z,startPoint.x,startPoint.y,startPoint.z);
-        if(vis.count(now_node)) return;
+        if(vis.count(now_node)) continue;
 
         //drop apo file(ok)
         QList<CellAPO> List_APO_Write;
@@ -1298,10 +1298,10 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        NeuronTree App2_Tree=readSWC_file(App2_Eswc_File_Name);
        NeuronTree Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize);
        bool use_answer_find_border=false;
-       if(Answer_Tree.listNeuron.empty()) return;
+       if(Answer_Tree.listNeuron.empty()) continue;
        if(App2_Tree.listNeuron.empty()){
            if(Answer_Tree.listNeuron.empty()){
-               return;
+               continue;
            } else{
                use_answer_find_border=true;
            }
@@ -1343,7 +1343,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            qDebug()<<"cut ok";
            //(new)
            if(center_id>0){
-               if(Answer_Tree.listNeuron.empty()) return;
+               if(Answer_Tree.listNeuron.empty()) continue;
                V_NeuronSWC_list V_Answer_Tree = NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
                //app2 is not accurate
                if(!Check_Tree_Identical(App2_Tree,V_Answer_Tree)){
@@ -1394,7 +1394,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
 
            qDebug()<<"Border_Point.size()"<<Border_Points.size();
 
-           if(Border_Points.empty()) return;
+           if(Border_Points.empty()) continue;
 
            for(const NeuronSWC & Border_Point:Border_Points){//absolute
                bool used=false;
@@ -1546,6 +1546,7 @@ int main(int argc, char **argv)
 
 
     const int blocksize=256;
+    vis.clear();
     App2_non_recursive_DFS(X,Y,Z,blocksize,"./",Answer_File);
 
 
