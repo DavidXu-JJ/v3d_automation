@@ -906,7 +906,7 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
 
     int amount=0;
     QQueue<bbox_extend> bbox_queue;
-    QMap<int,bool> has_extend;
+    QMap<int,bool> has_son_extend;
     bbox_queue.push_back(bbox_extend(0,-1,init_centerAPO,init_startPoint));
 
     while(!bbox_queue.empty()){
@@ -916,6 +916,8 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
         ImageMarker startPoint=now.startPoint;
         int now_id=now.id;
         int now_father=now.father_id;
+
+        if(has_son_extend.count(now_father)) continue;
 
         qDebug()<<"start BFS,now_id="<<now_id<<" father_id="<<now_father;
 
@@ -1117,12 +1119,11 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
 
                    qDebug()<<"New_Point_Offset:"<<New_Point_Offset.x<<" "<<New_Point_Offset.y<<" "<<New_Point_Offset.z;
                    qDebug()<<"New_Marker:"<<New_Marker.x<<" "<<New_Marker.y<<" "<<New_Marker.z;
-                   has_extend[now_id]=true;
 
+                   has_son_extend[now_father]=true;
                    ++amount;
                    int son_id=amount;
                    bbox_queue.push_back(bbox_extend(son_id,now_id,New_Point_Offset,New_Marker));
-                   if(has_extend.count(son_id)) break;
                }
 
            }
@@ -1197,10 +1198,11 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
                    New_Marker.z=blocksize/2-dz[direction[i]]*offset;
                    qDebug()<<"New_Point_Offset:"<<New_Point_Offset.x<<" "<<New_Point_Offset.y<<" "<<New_Point_Offset.z;
                    qDebug()<<"New_Marker:"<<New_Marker.x<<" "<<New_Marker.y<<" "<<New_Marker.z;
+
+                   has_son_extend[now_father]=true;
                    ++amount;
                    int son_id=amount;
                    bbox_queue.push_back(bbox_extend(son_id,now_id,New_Point_Offset,New_Marker));
-                   if(has_extend.count(son_id)) break;
                }
            }
        }
@@ -1215,8 +1217,8 @@ int main(int argc, char **argv)
 {
 
 
-    const int blocksize=128;
-    App2_DFS(X,Y,Z,blocksize,"./",Answer_File);
+    const int blocksize=256;
+    App2_BFS(X,Y,Z,blocksize,"./",Answer_File);
 
 
     qDebug()<<"finish";
