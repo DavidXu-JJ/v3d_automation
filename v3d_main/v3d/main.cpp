@@ -151,11 +151,13 @@ struct bbox_extend{
 
 QString Res_Path="G:/18454/RES(26298x35000x11041)";
 QString Vaa3d_App_Path="C:/3.603c";
-QString Work_Dir="G:/work_dir_non_recursive_DFS";
+QString Work_Dir="G:/work_dir_new";
 QString Answer_File="G:/18454_answer/whole_image.eswc";
 QMap<int,QVector<int> > Answer_Graph;
 QMap<int,NeuronSWC> Answer_Map;
 NeuronTree Ans_Tree;
+QMap<int,bool> Ans_used;
+
 int cnt=0;
 
 QProcess p;
@@ -175,6 +177,39 @@ double distance_square(const NeuronSWC & point_a,const NeuronSWC & point_b){
 bool between(const int & mid,const int & left,const int & right){   //double?
     return mid>=left&&mid<=right;
 }
+
+bool if_finish(){
+    int cnt=0;
+    for(const NeuronSWC & i:Ans_Tree.listNeuron){
+        if(Ans_used.count(i.n)){
+            ++cnt;
+        }
+    }
+    return cnt>=Ans_Tree.listNeuron.size();
+}
+bool if_need_extend(const CellAPO & centerAPO,const int & blocksize){
+    const int & X=centerAPO.x;
+    const int & Y=centerAPO.y;
+    const int & Z=centerAPO.z;
+    for(const NeuronSWC & swc:Ans_Tree.listNeuron){
+        if(between(swc.x,X-blocksize/2,X+blocksize/2)&&between(swc.y,Y-blocksize/2,Y+blocksize/2)&&between(swc.z,Z-blocksize/2,Z+blocksize/2)){
+            if(!Ans_used.count(swc.n)){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void update_Ans_used(const NeuronTree & updateTree){
+    for(const NeuronSWC & swc1:Ans_Tree.listNeuron){
+        for(const NeuronSWC & swc2:updateTree.listNeuron)
+        if(swc1.n==swc2.n){
+            Ans_used[swc1.n]=true;
+        }
+    }
+}
+
 
 double distance_XYZ(const XYZ & p1,const XYZ & p2){
     XYZ vec=p2-p1;
@@ -437,15 +472,15 @@ NeuronTree Get_Answer_Tree(const int & depth,const CellAPO & centerAPO,const Ima
                     q.push_back(std::make_pair(amount,i));
             }
         }
-        QString output_file="G:/test.swc";
-        QFile file(output_file);
-        qDebug()<<file.open(QIODevice::WriteOnly|QIODevice::Text);
+//        QString output_file="G:/test.swc";
+//        QFile file(output_file);
+//        qDebug()<<file.open(QIODevice::WriteOnly|QIODevice::Text);
 
-        QTextStream out(&file);
-        for(NeuronSWC & swc:Return_Tree.listNeuron){
-            out<<swc.n<<" "<<swc.type<<" "<<swc.x<<" "<<swc.y<<" "<<swc.z<<" "<<swc.r<<" "<<swc.pn<<"\n";
-        }
-        file.close();
+//        QTextStream out(&file);
+//        for(NeuronSWC & swc:Return_Tree.listNeuron){
+//            out<<swc.n<<" "<<swc.type<<" "<<swc.x<<" "<<swc.y<<" "<<swc.z<<" "<<swc.r<<" "<<swc.pn<<"\n";
+//        }
+//        file.close();
         return Return_Tree;
     }
 
@@ -551,6 +586,8 @@ QVector<NeuronSWC>  Find_Extend_Marker(const CellAPO & centerAPO,const ImageMark
 
 void DFS(const int & depth, const CellAPO & centerAPO,ImageMarker & startPoint,const int &blocksize,V_NeuronSWC_list & App2_Generate,bool & has_extend){
     //    if(dep==3) return;
+   if(if_finish()) return;
+   if(!if_need_extend(centerAPO,blocksize)) return;
    qDebug()<<"start DFS,now depth="<<depth;
 
    node now=node(centerAPO.x,centerAPO.y,centerAPO.z,startPoint.x,startPoint.y,startPoint.z);
@@ -604,6 +641,7 @@ void DFS(const int & depth, const CellAPO & centerAPO,ImageMarker & startPoint,c
     qDebug()<<"readfile";
     NeuronTree App2_Tree=readSWC_file(App2_Eswc_File_Name);
     NeuronTree Answer_Tree = Get_Answer_Tree(depth,centerAPO,startPoint,blocksize);
+    update_Ans_used(Answer_Tree);
     bool use_answer_find_border=false;
     if(Answer_Tree.listNeuron.empty()) return;
     if(App2_Tree.listNeuron.empty()){
@@ -652,8 +690,9 @@ void DFS(const int & depth, const CellAPO & centerAPO,ImageMarker & startPoint,c
         if(depth>0){
             if(Answer_Tree.listNeuron.empty()) return;
             V_NeuronSWC_list V_Answer_Tree = NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
+            V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
             //app2 is not accurate
-            if(!Check_Tree_Identical(App2_Tree,V_Answer_Tree)){
+            if(!Check_Tree_Identical(V_Answer_Tree,V_App2_Tree)){
                 use_answer_find_border=true;
                 App2_Tree=Answer_Tree;
             }
@@ -662,8 +701,6 @@ void DFS(const int & depth, const CellAPO & centerAPO,ImageMarker & startPoint,c
     else{
         App2_Tree=Answer_Tree;
     }
-
-
 
     //save the answer(ok)
     qDebug()<<"start save";
@@ -915,6 +952,8 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
         ImageMarker startPoint=now.startPoint;
         int center_id=now.center_id;
         if(has_extend.count(center_id)) continue;
+        if(if_finish()) continue;
+        if(!if_need_extend(centerAPO,blocksize)) continue;
 
         qDebug()<<"start BFS,center_id="<<center_id;
 
@@ -970,6 +1009,7 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
        qDebug()<<"readfile";
        NeuronTree App2_Tree=readSWC_file(App2_Eswc_File_Name);
        NeuronTree Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize);
+       update_Ans_used(Answer_Tree);
        bool use_answer_find_border=false;
        if(Answer_Tree.listNeuron.empty()) continue;
        if(App2_Tree.listNeuron.empty()){
@@ -1018,8 +1058,9 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
            if(center_id>0){
                if(Answer_Tree.listNeuron.empty()) continue;
                V_NeuronSWC_list V_Answer_Tree = NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
+               V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
                //app2 is not accurate
-               if(!Check_Tree_Identical(App2_Tree,V_Answer_Tree)){
+               if(!Check_Tree_Identical(V_Answer_Tree,V_App2_Tree)){
                    use_answer_find_border=true;
                    App2_Tree=Answer_Tree;
                }
@@ -1047,6 +1088,7 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
            writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
 
        }
+
 
        qDebug()<<"save ok";
 
@@ -1242,6 +1284,8 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
         ImageMarker startPoint=now.startPoint;
         int center_id=now.center_id;
         if(has_extend.count(center_id)) continue;
+        if(if_finish()) continue;
+        if(!if_need_extend(centerAPO,blocksize)) continue;
 
         qDebug()<<"start DFS,center_id="<<center_id;
 
@@ -1297,6 +1341,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        qDebug()<<"readfile";
        NeuronTree App2_Tree=readSWC_file(App2_Eswc_File_Name);
        NeuronTree Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize);
+       update_Ans_used(Answer_Tree);
        bool use_answer_find_border=false;
        if(Answer_Tree.listNeuron.empty()) continue;
        if(App2_Tree.listNeuron.empty()){
@@ -1345,8 +1390,9 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            if(center_id>0){
                if(Answer_Tree.listNeuron.empty()) continue;
                V_NeuronSWC_list V_Answer_Tree = NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
+               V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
                //app2 is not accurate
-               if(!Check_Tree_Identical(App2_Tree,V_Answer_Tree)){
+               if(!Check_Tree_Identical(V_Answer_Tree,V_App2_Tree)){
                    use_answer_find_border=true;
                    App2_Tree=Answer_Tree;
                }
@@ -1355,7 +1401,6 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        else{
            App2_Tree=Answer_Tree;
        }
-
 
        //save the answer(ok)
        qDebug()<<"start save";
@@ -1374,6 +1419,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
 
        }
+
 
        qDebug()<<"save ok";
 
@@ -1545,7 +1591,7 @@ int main(int argc, char **argv)
 {
 
 
-    const int blocksize=512;
+    const int blocksize=256;
     vis.clear();
     App2_non_recursive_DFS(X,Y,Z,blocksize,"./",Answer_File);
 
