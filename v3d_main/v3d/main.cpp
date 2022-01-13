@@ -151,7 +151,7 @@ struct bbox_extend{
 
 QString Res_Path="G:/18454/RES(26298x35000x11041)";
 QString Vaa3d_App_Path="C:/3.603c";
-QString Work_Dir="G:/work_dir_new";
+QString Work_Dir="G:/work_dir_non_recursive_DFS_512";
 QString Answer_File="G:/18454_answer/whole_image.eswc";
 QMap<int,QVector<int> > Answer_Graph;
 QMap<int,NeuronSWC> Answer_Map;
@@ -254,6 +254,7 @@ double Distance_Unit_To_Seg(const V_NeuronSWC_unit & p, const V_NeuronSWC & s){ 
     return mn;
 }
 double Distance_Unit_To_Tree(const V_NeuronSWC_unit & p,const V_NeuronSWC_list & Check_Tree){
+    if(Check_Tree.seg.empty()) return 1e-8;
     double mn=1e8;
     for(const V_NeuronSWC & Seg:Check_Tree.seg){
         mn=std::min(mn,Distance_Unit_To_Seg(p,Seg));
@@ -391,6 +392,9 @@ std::vector<int> Judge_Direction(const XYZ & vec){
             ++direction[i];
         if(direction[i]==4 && vec.z<0)
             ++direction[i];
+    }
+    for(int i=2;i>0;--i){
+        direction.push_back(direction[i]+((direction[i]&1)?-1:1 ) );
     }
 
     return direction;
@@ -704,21 +708,50 @@ void DFS(const int & depth, const CellAPO & centerAPO,ImageMarker & startPoint,c
 
     //save the answer(ok)
     qDebug()<<"start save";
+    const int close_distance=4;
     V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(App2_Tree);
     for(const V_NeuronSWC & Seg:Segments.seg){
         V_NeuronSWC Add_Seg=Seg;
-        for(V_NeuronSWC_unit & swc:Add_Seg.row){
+        QMap<int,bool> redundant;
+        for(int i=0; i<Add_Seg.row.size();++i){
             //(ok)
+            V_NeuronSWC_unit & swc=Add_Seg.row[i];
             swc.x+=centerAPO.x-blocksize/2;
             swc.y+=centerAPO.y-blocksize/2;
             swc.z+=centerAPO.z-blocksize/2;
+            if(App2_Generate.seg.empty()) continue;
+            qDebug()<<"Distance_Unit_To_Tree(swc,App2_Generate)"<<Distance_Unit_To_Tree(swc,App2_Generate);
+            if(Distance_Unit_To_Tree(swc,App2_Generate)<close_distance){
+                redundant[i]=true;
+            }
         }
-        App2_Generate.append(Add_Seg);
 
-        NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
-        writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
+        for(int i=0;i<Add_Seg.row.size();++i){
+            qDebug()<<Add_Seg.row.size();
+            if(!redundant.count(i)){
+                V_NeuronSWC Not_Redundant;
+                int now=i;
+                int amount=0;
+                while(now<Add_Seg.row.size() && !redundant.count(now)){
+                    V_NeuronSWC_unit unit=Add_Seg.row[now];
+                    ++amount;
+                    unit.n=amount;
+                    unit.parent=amount+1;
+                    Not_Redundant.row.push_back(unit);
+                    qDebug()<<unit.n<<" "<<unit.parent;
+                    ++now;
+                }
+                Not_Redundant.row.back().parent=-1;
+                i=now;
+                if(Not_Redundant.row.size()<=2) continue;
+                App2_Generate.append(Not_Redundant);
 
+            }
+        }
     }
+
+    NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
+    writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
 
     qDebug()<<"save ok";
 
@@ -866,7 +899,7 @@ void DFS(const int & depth, const CellAPO & centerAPO,ImageMarker & startPoint,c
             //direction=4 positive axis z       dx= 0, dy= 0, dz= 1
             //direction=5 negative axis z       dx= 0, dy= 0, dz=-1
             //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
-            for(int i=0;i<3;++i){
+            for(int i=0;i<5;++i){
                 CellAPO New_Point_Offset=New_Point;
                 New_Point_Offset.x+=dx[direction[i]]*offset;
                 New_Point_Offset.y+=dy[direction[i]]*offset;
@@ -1073,22 +1106,50 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
 
        //save the answer(ok)
        qDebug()<<"start save";
+       const int close_distance=4;
        V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(App2_Tree);
        for(const V_NeuronSWC & Seg:Segments.seg){
            V_NeuronSWC Add_Seg=Seg;
-           for(V_NeuronSWC_unit & swc:Add_Seg.row){
+           QMap<int,bool> redundant;
+           for(int i=0; i<Add_Seg.row.size();++i){
                //(ok)
+               V_NeuronSWC_unit & swc=Add_Seg.row[i];
                swc.x+=centerAPO.x-blocksize/2;
                swc.y+=centerAPO.y-blocksize/2;
                swc.z+=centerAPO.z-blocksize/2;
+               if(App2_Generate.seg.empty()) continue;
+               qDebug()<<"Distance_Unit_To_Tree(swc,App2_Generate)"<<Distance_Unit_To_Tree(swc,App2_Generate);
+               if(Distance_Unit_To_Tree(swc,App2_Generate)<close_distance){
+                   redundant[i]=true;
+               }
            }
-           App2_Generate.append(Add_Seg);
 
-           NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
-           writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
+           for(int i=0;i<Add_Seg.row.size();++i){
+               qDebug()<<Add_Seg.row.size();
+               if(!redundant.count(i)){
+                   V_NeuronSWC Not_Redundant;
+                   int now=i;
+                   int amount=0;
+                   while(now<Add_Seg.row.size() && !redundant.count(now)){
+                       V_NeuronSWC_unit unit=Add_Seg.row[now];
+                       ++amount;
+                       unit.n=amount;
+                       unit.parent=amount+1;
+                       Not_Redundant.row.push_back(unit);
+                       qDebug()<<unit.n<<" "<<unit.parent;
+                       ++now;
+                   }
+                   Not_Redundant.row.back().parent=-1;
+                   i=now;
+                   if(Not_Redundant.row.size()<=2) continue;
+                   App2_Generate.append(Not_Redundant);
 
+               }
+           }
        }
 
+       NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
+       writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
 
        qDebug()<<"save ok";
 
@@ -1228,7 +1289,7 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
                //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
 
                ++amount;
-               for(int i=0;i<3;++i){
+               for(int i=0;i<5;++i){
                    CellAPO New_Point_Offset=New_Point;
                    New_Point_Offset.x+=dx[direction[i]]*offset;
                    New_Point_Offset.y+=dy[direction[i]]*offset;
@@ -1404,22 +1465,50 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
 
        //save the answer(ok)
        qDebug()<<"start save";
+       const int close_distance=4;
        V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(App2_Tree);
        for(const V_NeuronSWC & Seg:Segments.seg){
            V_NeuronSWC Add_Seg=Seg;
-           for(V_NeuronSWC_unit & swc:Add_Seg.row){
+           QMap<int,bool> redundant;
+           for(int i=0; i<Add_Seg.row.size();++i){
                //(ok)
+               V_NeuronSWC_unit & swc=Add_Seg.row[i];
                swc.x+=centerAPO.x-blocksize/2;
                swc.y+=centerAPO.y-blocksize/2;
                swc.z+=centerAPO.z-blocksize/2;
+               if(App2_Generate.seg.empty()) continue;
+               qDebug()<<"Distance_Unit_To_Tree(swc,App2_Generate)"<<Distance_Unit_To_Tree(swc,App2_Generate);
+               if(Distance_Unit_To_Tree(swc,App2_Generate)<close_distance){
+                   redundant[i]=true;
+               }
            }
-           App2_Generate.append(Add_Seg);
 
-           NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
-           writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
+           for(int i=0;i<Add_Seg.row.size();++i){
+               qDebug()<<Add_Seg.row.size();
+               if(!redundant.count(i)){
+                   V_NeuronSWC Not_Redundant;
+                   int now=i;
+                   int amount=0;
+                   while(now<Add_Seg.row.size() && !redundant.count(now)){
+                       V_NeuronSWC_unit unit=Add_Seg.row[now];
+                       ++amount;
+                       unit.n=amount;
+                       unit.parent=amount+1;
+                       Not_Redundant.row.push_back(unit);
+                       qDebug()<<unit.n<<" "<<unit.parent;
+                       ++now;
+                   }
+                   Not_Redundant.row.back().parent=-1;
+                   i=now;
+                   if(Not_Redundant.row.size()<=2) continue;
+                   App2_Generate.append(Not_Redundant);
 
+               }
+           }
        }
 
+       NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
+       writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
 
        qDebug()<<"save ok";
 
@@ -1559,7 +1648,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
 
                ++amount;
-               for(int i=0;i<3;++i){
+               for(int i=0;i<5;++i){
                    CellAPO New_Point_Offset=New_Point;
                    New_Point_Offset.x+=dx[direction[i]]*offset;
                    New_Point_Offset.y+=dy[direction[i]]*offset;
@@ -1591,7 +1680,7 @@ int main(int argc, char **argv)
 {
 
 
-    const int blocksize=256;
+    const int blocksize=512;
     vis.clear();
     App2_non_recursive_DFS(X,Y,Z,blocksize,"./",Answer_File);
 
