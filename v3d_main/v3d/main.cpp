@@ -151,7 +151,7 @@ struct bbox_extend{
 
 QString Res_Path="G:/18454/RES(26298x35000x11041)";
 QString Vaa3d_App_Path="C:/3.603c";
-QString Work_Dir="G:/work_dir_non_recursive_DFS_512";
+QString Work_Dir="G:/work_dir_new";
 QString Answer_File="G:/18454_answer/whole_image.eswc";
 QMap<int,QVector<int> > Answer_Graph;
 QMap<int,NeuronSWC> Answer_Map;
@@ -267,7 +267,7 @@ double Distance_Unit_To_Tree(const NeuronSWC & p,const V_NeuronSWC_list & Check_
     return Distance_Unit_To_Tree(u,Check_Tree);
 }
 bool Check_Seg_Identical(const V_NeuronSWC & Check_Seg,const V_NeuronSWC_list & Answer_Tree){
-    const double threshold=400;
+    const double threshold=300;
     double mx=-1e8;
     for(const V_NeuronSWC_unit & Check_Point:Check_Seg.row){
          for(const V_NeuronSWC & Answer_Seg:Answer_Tree.seg){
@@ -326,7 +326,7 @@ void crop_ans_swc(const QString& input_file,const int &X,const int &Y,const int 
     }
     file.close();
 }
-QVector<std::pair<NeuronSWC,QQueue<XYZ> > > Find_Border(const ImageMarker & Absolute_Marker,const NeuronTree & App2_Tree,const int & blocksize,const QMap<int,QVector<int> > & son, const QMap<int,NeuronSWC> & mp){
+QVector<std::pair<NeuronSWC,QQueue<XYZ> > > Find_Border(const NeuronTree & App2_Tree,const int & blocksize,const QMap<int,QVector<int> > & son, const QMap<int,NeuronSWC> & mp){
 
     const int compacity=5;      //decide how many vectors to memorize
     QVector<std::pair<int,QQueue<XYZ> > > border;
@@ -352,18 +352,6 @@ QVector<std::pair<NeuronSWC,QQueue<XYZ> > > Find_Border(const ImageMarker & Abso
             }
         }
     }
-    int delete_id=-1;
-    double mn=1e8;
-    for(int i=0;i<border.size();++i){
-        NeuronSWC point = mp[border[i].first];
-        double dis=distance_XYZ(XYZ(point),XYZ(Absolute_Marker));
-        if(mn>dis){
-            mn=dis;
-            delete_id=i;
-        }
-    }
-    if(!border.empty() && delete_id<border.size() && delete_id!=-1)
-      border.erase(border.begin()+delete_id);
 
     const double Border_Threshold=50;
     QVector<std::pair<NeuronSWC,QQueue<XYZ> > > ret;
@@ -405,10 +393,6 @@ std::vector<int> Judge_Direction(const XYZ & vec){
         if(direction[i]==4 && vec.z<0)
             ++direction[i];
     }
-    for(int i=2;i>0;--i){
-        direction.push_back(direction[i]+((direction[i]&1)?-1:1 ) );
-    }
-
     for(int i=2;i>0;--i){
         direction.push_back(direction[i]+((direction[i]&1)?-1:1 ) );
     }
@@ -683,7 +667,7 @@ void DFS(const int & depth, const CellAPO & centerAPO,ImageMarker & startPoint,c
             mp[swc.n]=swc;
         }
         qDebug()<<"Find_Border";
-        Border_Point_Vector=Find_Border(Absolute_Marker,App2_Tree,blocksize,son,mp);
+        Border_Point_Vector=Find_Border(App2_Tree,blocksize,son,mp);
         qDebug()<<"Find_Border ok";
 
         //we think the furthest border point is not accurate
@@ -785,20 +769,19 @@ void DFS(const int & depth, const CellAPO & centerAPO,ImageMarker & startPoint,c
 
 
     //if the square of distance between used_swc and new_border_point is lower than identical_threshold, don't search it
-    const double identical_threshold=600;   //(undetermined)
+    const double identical_threshold=300;   //(undetermined)
     qDebug()<<"use_answer_find_border:"<<use_answer_find_border;
-
-    //check if border is identical to last marker
-    NeuronSWC Start_Marker_Location;
-    //marker has been changed to absolute location
-    Start_Marker_Location.x=Absolute_Marker.x;
-    Start_Marker_Location.y=Absolute_Marker.y;
-    Start_Marker_Location.z=Absolute_Marker.z;
-    used_swc.push_back(Start_Marker_Location);
-
     if(use_answer_find_border||Border_Point_Vector.empty()){
         QVector<NeuronSWC> Border_Points=Find_Extend_Marker(centerAPO,Absolute_Marker,blocksize);
         qDebug()<<"Find_Extend_Marker ok";
+
+        //check if border is identical to last marker
+        NeuronSWC Start_Marker_Location;
+        //marker has been changed to absolute location
+        Start_Marker_Location.x=Absolute_Marker.x;
+        Start_Marker_Location.y=Absolute_Marker.y;
+        Start_Marker_Location.z=Absolute_Marker.z;
+        used_swc.push_back(Start_Marker_Location);
 
         qDebug()<<"Border_Point.size()"<<Border_Points.size();
 
@@ -837,7 +820,7 @@ void DFS(const int & depth, const CellAPO & centerAPO,ImageMarker & startPoint,c
             //direction=4 positive axis z       dx= 0, dy= 0, dz= 1
             //direction=5 negative axis z       dx= 0, dy= 0, dz=-1
             //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
-            for(int i=0;i<5;++i){
+            for(int i=0;i<3;++i){
                 CellAPO New_Point_Offset=New_Point;
                 New_Point_Offset.x+=dx[direction[i]]*offset;
                 New_Point_Offset.y+=dy[direction[i]]*offset;
@@ -1081,7 +1064,7 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
                mp[swc.n]=swc;
            }
            qDebug()<<"Find_Border";
-           Border_Point_Vector=Find_Border(Absolute_Marker,App2_Tree,blocksize,son,mp);
+           Border_Point_Vector=Find_Border(App2_Tree,blocksize,son,mp);
            qDebug()<<"Find_Border ok";
 
            //we think the furthest border point is not accurate
@@ -1171,22 +1154,19 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
        qDebug()<<"save ok";
 
        //if the square of distance between used_swc and new_border_point is lower than identical_threshold, don't search it
-       const double identical_threshold=600;   //(undetermined)
+       const double identical_threshold=300;   //(undetermined)
        qDebug()<<"use_answer_find_border:"<<use_answer_find_border;
-
-       //check if border is identical to last marker
-       NeuronSWC Start_Marker_Location;
-       //marker has been changed to absolute location
-       Start_Marker_Location.x=Absolute_Marker.x;
-       Start_Marker_Location.y=Absolute_Marker.y;
-       Start_Marker_Location.z=Absolute_Marker.z;
-       used_swc.push_back(Start_Marker_Location);
-
        if(use_answer_find_border||Border_Point_Vector.empty()){
            QVector<NeuronSWC> Border_Points=Find_Extend_Marker(centerAPO,Absolute_Marker,blocksize);
            qDebug()<<"Find_Extend_Marker ok";
 
-
+           //check if border is identical to last marker
+           NeuronSWC Start_Marker_Location;
+           //marker has been changed to absolute location
+           Start_Marker_Location.x=Absolute_Marker.x;
+           Start_Marker_Location.y=Absolute_Marker.y;
+           Start_Marker_Location.z=Absolute_Marker.z;
+           used_swc.push_back(Start_Marker_Location);
 
            qDebug()<<"Border_Point.size()"<<Border_Points.size();
 
@@ -1227,7 +1207,7 @@ void App2_BFS(const int & Start_x,const int & Start_y,const int & Start_z,const 
                //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
 
                ++amount;
-               for(int i=0;i<5;++i){
+               for(int i=0;i<3;++i){
                    CellAPO New_Point_Offset=New_Point;
                    New_Point_Offset.x+=dx[direction[i]]*offset;
                    New_Point_Offset.y+=dy[direction[i]]*offset;
@@ -1444,7 +1424,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                mp[swc.n]=swc;
            }
            qDebug()<<"Find_Border";
-           Border_Point_Vector=Find_Border(Absolute_Marker,App2_Tree,blocksize,son,mp);
+           Border_Point_Vector=Find_Border(App2_Tree,blocksize,son,mp);
            qDebug()<<"Find_Border ok";
 
            //we think the furthest border point is not accurate
@@ -1533,22 +1513,19 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        qDebug()<<"save ok";
 
        //if the square of distance between used_swc and new_border_point is lower than identical_threshold, don't search it
-       const double identical_threshold=600;   //(undetermined)
+       const double identical_threshold=300;   //(undetermined)
        qDebug()<<"use_answer_find_border:"<<use_answer_find_border;
-
-       //check if border is identical to last marker
-       NeuronSWC Start_Marker_Location;
-       //marker has been changed to absolute location
-       Start_Marker_Location.x=Absolute_Marker.x;
-       Start_Marker_Location.y=Absolute_Marker.y;
-       Start_Marker_Location.z=Absolute_Marker.z;
-       used_swc.push_back(Start_Marker_Location);
-
        if(use_answer_find_border||Border_Point_Vector.empty()){
            QVector<NeuronSWC> Border_Points=Find_Extend_Marker(centerAPO,Absolute_Marker,blocksize);
            qDebug()<<"Find_Extend_Marker ok";
 
-
+           //check if border is identical to last marker
+           NeuronSWC Start_Marker_Location;
+           //marker has been changed to absolute location
+           Start_Marker_Location.x=Absolute_Marker.x;
+           Start_Marker_Location.y=Absolute_Marker.y;
+           Start_Marker_Location.z=Absolute_Marker.z;
+           used_swc.push_back(Start_Marker_Location);
 
            qDebug()<<"Border_Point.size()"<<Border_Points.size();
 
@@ -1589,7 +1566,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
 
                ++amount;
-               for(int i=0;i<5;++i){
+               for(int i=0;i<3;++i){
                    CellAPO New_Point_Offset=New_Point;
                    New_Point_Offset.x+=dx[direction[i]]*offset;
                    New_Point_Offset.y+=dy[direction[i]]*offset;
@@ -1703,7 +1680,7 @@ int main(int argc, char **argv)
 {
 
 
-    const int blocksize=512;
+    const int blocksize=256;
     vis.clear();
     App2_non_recursive_DFS(X,Y,Z,blocksize,"./",Answer_File);
 
