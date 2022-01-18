@@ -171,7 +171,7 @@ QVector<NeuronSWC> used_swc;
 int X=14530,Y=10693,Z=3124;
 double close_distance=4;
 double identical_threshold=300;   //(undetermined)
-double seg_identical_threshold=300;
+double seg_identical_threshold=500;
 double Border_Threshold=50;
 
 double distance_square(const NeuronSWC & point_a,const NeuronSWC & point_b){
@@ -529,7 +529,7 @@ NeuronTree Get_Answer_Tree(const int & depth,const CellAPO & centerAPO,const Ima
     //这个参数我认为有点底层，不太应该给用户调整，
     //表示如果答案在这个bbox的边界点中，距离本次DFS距离最小的Marker距离如果大于threshold，就舍弃，认为这个本次的bbox中没有以Marker为起点的树
     //之前生成的图为了保证尽可能搜得广，所以在blocksize为256的时候，直接取500，实际合理的threshold没有测试过，姑且取了blocksize/4
-    const int threshold=blocksize/4;
+    const int threshold=1.0*300/256*blocksize;
     if(mn>threshold) return NeuronTree();
 
     NeuronTree Return_Tree;
@@ -639,6 +639,132 @@ void init(const QString & Answer_File){
     }
 }
 
+NeuronTree Vanilla_App2(const CellAPO & centerAPO,const ImageMarker & startPoint,const int & blocksize,const QString & rawFileName){
+    //drop marker file(ok)
+    QList<ImageMarker> List_Marker_Write;
+    List_Marker_Write.push_back(startPoint);
+    //Marker is changed to absolute location
+    //location transform has been checked(ok)
+    ImageMarker Absolute_Marker=startPoint;
+    Absolute_Marker.x+=centerAPO.x-blocksize/2;
+    Absolute_Marker.y+=centerAPO.y-blocksize/2;
+    Absolute_Marker.z+=centerAPO.z-blocksize/2;
+    QString Marker_File_Name=generate_marker_name(Work_Dir.toStdString()+"/MarkerFile",Absolute_Marker);	//make file in ./MarkerFile/xxx.000_xxx.000_xxx.000.marker
+    writeMarker_file(Marker_File_Name,List_Marker_Write);
+
+
+  //app2(ok)
+   QString App2_Eswc_File_Name=generate_eswc_name(Work_Dir.toStdString()+"/SwcFile",centerAPO);
+   qDebug()<<"app2:"
+          <<p.execute(Vaa3d_App_Path+QString("/vaa3d_msvc.exe"), QStringList()
+              <<"/x"<<Vaa3d_App_Path+QString("/plugins/neuron_tracing/Vaa3D_Neuron2/vn2.dll")
+              <<"/f"<<"app2"<<"/p"<<Marker_File_Name<<QString::number(0)<<QString::number(-1)
+              <<"/i"<< QString(Work_Dir+QString("/testV3draw/thres_")+rawFileName)<<"/o"<<App2_Eswc_File_Name);
+
+   return readSWC_file(App2_Eswc_File_Name);
+}
+
+NeuronTree Find_Valid_App2_Tree(const CellAPO & centerAPO,ImageMarker & startPoint,const int & blocksize,const QString & rawFileName){
+    const int range=3;
+    QVector<int> d={0};
+    for(int i=1;i<=range;++i){
+        d.push_back(i);
+        d.push_back(-i);
+    }
+    NeuronTree ret;
+    if(startPoint.x!=blocksize/2){
+        for(int i=0;i<d.size();++i){
+            for(int j=0;j<=i;++j){
+                const int & d1=d[i];
+                const int & d2=d[j];
+                ImageMarker new_marker=startPoint;
+                new_marker.y+=d1;
+                new_marker.z+=d2;
+                ret=Vanilla_App2(centerAPO,new_marker,blocksize,rawFileName);
+                if(!ret.listNeuron.empty()){
+                    startPoint=new_marker;
+                    break;
+                }
+
+                new_marker=startPoint;
+                new_marker.z+=d1;
+                new_marker.y+=d2;
+                ret=Vanilla_App2(centerAPO,new_marker,blocksize,rawFileName);
+                if(!ret.listNeuron.empty()){
+                    startPoint=new_marker;
+                    break;
+                }
+            }
+            if(!ret.listNeuron.empty()){
+                break;
+            }
+        }
+    }else{
+        if(startPoint.y!=blocksize/2){
+            for(int i=0;i<d.size();++i){
+                for(int j=0;j<=i;++j){
+                    const int & d1=d[i];
+                    const int & d2=d[j];
+                    ImageMarker new_marker=startPoint;
+                    new_marker.x+=d1;
+                    new_marker.z+=d2;
+                    ret=Vanilla_App2(centerAPO,new_marker,blocksize,rawFileName);
+                    if(!ret.listNeuron.empty()){
+                        startPoint=new_marker;
+                        break;
+                    }
+
+                    new_marker=startPoint;
+                    new_marker.z+=d1;
+                    new_marker.x+=d2;
+                    ret=Vanilla_App2(centerAPO,new_marker,blocksize,rawFileName);
+                    if(!ret.listNeuron.empty()){
+                        startPoint=new_marker;
+                        break;
+                    }
+                }
+                if(!ret.listNeuron.empty()){
+                    break;
+                }
+            }
+        }else{
+            if(startPoint.z!=blocksize/2){
+                for(int i=0;i<d.size();++i){
+                    for(int j=0;j<=i;++j){
+                        const int & d1=d[i];
+                        const int & d2=d[j];
+                        ImageMarker new_marker=startPoint;
+                        new_marker.x+=d1;
+                        new_marker.y+=d2;
+                        ret=Vanilla_App2(centerAPO,new_marker,blocksize,rawFileName);
+                        if(!ret.listNeuron.empty()){
+                            startPoint=new_marker;
+                            break;
+                        }
+
+                        new_marker=startPoint;
+                        new_marker.y+=d1;
+                        new_marker.x+=d2;
+                        ret=Vanilla_App2(centerAPO,new_marker,blocksize,rawFileName);
+                        if(!ret.listNeuron.empty()){
+                            startPoint=new_marker;
+                            break;
+                        }
+                    }
+                    if(!ret.listNeuron.empty()){
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+   QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
+   QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
+
+   return ret;
+}
+
 void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & Start_z,const int & blocksize,const QString & File_Name){
 
     init(Answer_File);
@@ -681,17 +807,6 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
         QString APO_File_Name=generate_apo_name(Work_Dir.toStdString()+"/APOFile",centerAPO);	//make file in ./APOFile/xxx.000_xxx.000_xxx.000.apo
         writeAPO_file(APO_File_Name,List_APO_Write);
 
-        //drop marker file(ok)
-        QList<ImageMarker> List_Marker_Write;
-        List_Marker_Write.push_back(startPoint);
-        //Marker is changed to absolute location
-        //location transform has been checked(ok)
-        ImageMarker Absolute_Marker=startPoint;
-        Absolute_Marker.x+=centerAPO.x-blocksize/2;
-        Absolute_Marker.y+=centerAPO.y-blocksize/2;
-        Absolute_Marker.z+=centerAPO.z-blocksize/2;
-        QString Marker_File_Name=generate_marker_name(Work_Dir.toStdString()+"/MarkerFile",Absolute_Marker);	//make file in ./MarkerFile/xxx.000_xxx.000_xxx.000.marker
-        writeMarker_file(Marker_File_Name,List_Marker_Write);
 
         QString rawFileName=QString("%1.000_%2.000_%3.000.v3draw").arg(centerAPO.x).arg(centerAPO.y).arg(centerAPO.z);
 
@@ -707,23 +822,31 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            <<p.execute(Vaa3d_App_Path+QString("/vaa3d_msvc.exe"),QStringList()
                <<"/x"<<Vaa3d_App_Path+QString("/plugins/image_thresholding/Simple_Adaptive_Thresholding/ada_threshold.dll")
                <<"/f"<<"adath"<<"/i"<<Work_Dir+QString("/testV3draw/")+rawFileName<<"/o"<<QString(Work_Dir+QString("/testV3draw/thres_")+rawFileName));
-      //app2(ok)
-       QString App2_Eswc_File_Name=generate_eswc_name(Work_Dir.toStdString()+"/SwcFile",centerAPO);
-       qDebug()<<"app2:"
-              <<p.execute(Vaa3d_App_Path+QString("/vaa3d_msvc.exe"), QStringList()
-                  <<"/x"<<Vaa3d_App_Path+QString("/plugins/neuron_tracing/Vaa3D_Neuron2/vn2.dll")
-                  <<"/f"<<"app2"<<"/p"<<Marker_File_Name<<QString::number(0)<<QString::number(-1)
-                  <<"/i"<< QString(Work_Dir+QString("/testV3draw/thres_")+rawFileName)<<"/o"<<App2_Eswc_File_Name);
 
-       QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
-       QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
+        ImageMarker startPointBackup=startPoint;
+
+        NeuronTree App2_Tree;
+        if(center_id!=0)   App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,rawFileName);
+        else {
+            App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+            QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
+            QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
+        }
+
+        if(App2_Tree.listNeuron.empty())    startPoint=startPointBackup;
+
+        ImageMarker Absolute_Marker=startPoint;
+        Absolute_Marker.x+=centerAPO.x-blocksize/2;
+        Absolute_Marker.y+=centerAPO.y-blocksize/2;
+        Absolute_Marker.z+=centerAPO.z-blocksize/2;
+
+
 
        vis[now_node]=true;
 
 
        //readfile(ok)
        qDebug()<<"readfile";
-       NeuronTree App2_Tree=readSWC_file(App2_Eswc_File_Name);
        NeuronTree Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize);
        update_Ans_used(Answer_Tree);
        bool use_answer_find_border=false;
