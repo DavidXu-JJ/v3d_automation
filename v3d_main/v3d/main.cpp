@@ -668,8 +668,8 @@ NeuronTree Find_Valid_App2_Tree(const CellAPO & centerAPO,ImageMarker & startPoi
     const int range=3;
     QVector<int> d={0};
     for(int i=1;i<=range;++i){
-        d.push_back(i);
-        d.push_back(-i);
+        d.push_back(2*i);
+        d.push_back(-2*i);
     }
     NeuronTree ret;
     if(startPoint.x!=blocksize/2){
@@ -849,13 +849,13 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        qDebug()<<"readfile";
        NeuronTree Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize);
        update_Ans_used(Answer_Tree);
-       bool use_answer_find_border=false;
+       bool use_answer=false;
        if(Answer_Tree.listNeuron.empty()) continue;
        if(App2_Tree.listNeuron.empty()){
            if(Answer_Tree.listNeuron.empty()){
                continue;
            } else{
-               use_answer_find_border=true;
+               use_answer=true;
            }
        }
        qDebug()<<"readfile ok";
@@ -863,7 +863,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        QMap<int,QVector<int> > son;    //record son
        QMap<int,NeuronSWC> mp;         //map id to single_swc
        QVector<std::pair<NeuronSWC,QQueue<XYZ> > > Border_Point_Vector;
-       if(!use_answer_find_border){
+       if(!use_answer){
            //find_border_point
            for(const NeuronSWC & swc:App2_Tree.listNeuron){
                son[swc.pn].push_back(swc.n);
@@ -900,7 +900,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
                //app2 is not accurate
                if(!Check_Tree_Identical(V_Answer_Tree,V_App2_Tree)){
-                   use_answer_find_border=true;
+                   use_answer=true;
                    App2_Tree=Answer_Tree;
                }
            }
@@ -937,7 +937,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                    while(now<Add_Seg.row.size() && !redundant.count(now)){
                        V_NeuronSWC_unit unit=Add_Seg.row[now];
                        ++amount;
-                       if(use_answer_find_border) unit.type=3;
+                       if(use_answer) unit.type=3;
                        else unit.type=2;
                        unit.n=amount;
                        unit.parent=amount+1;
@@ -960,160 +960,78 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        qDebug()<<"save ok";
 
        //if the square of distance between used_swc and new_border_point is lower than identical_threshold, don't search it
-       qDebug()<<"use_answer_find_border:"<<use_answer_find_border;
-       if(use_answer_find_border||Border_Point_Vector.empty()){
-           QVector<NeuronSWC> Border_Points=Find_Extend_Marker(centerAPO,Absolute_Marker,blocksize);
-           qDebug()<<"Find_Extend_Marker ok";
+       qDebug()<<"use_answer:"<<use_answer;
+       QVector<NeuronSWC> Border_Points=Find_Extend_Marker(centerAPO,Absolute_Marker,blocksize);
+       qDebug()<<"Find_Extend_Marker ok";
 
-           //check if border is identical to last marker
-           NeuronSWC Start_Marker_Location;
-           //marker has been changed to absolute location
-           Start_Marker_Location.x=Absolute_Marker.x;
-           Start_Marker_Location.y=Absolute_Marker.y;
-           Start_Marker_Location.z=Absolute_Marker.z;
-           used_swc.push_back(Start_Marker_Location);
+       //check if border is identical to last marker
+       NeuronSWC Start_Marker_Location;
+       //marker has been changed to absolute location
+       Start_Marker_Location.x=Absolute_Marker.x;
+       Start_Marker_Location.y=Absolute_Marker.y;
+       Start_Marker_Location.z=Absolute_Marker.z;
+       used_swc.push_back(Start_Marker_Location);
 
-           qDebug()<<"Border_Point.size()"<<Border_Points.size();
+       qDebug()<<"Border_Point.size()"<<Border_Points.size();
 
-           if(Border_Points.empty()) continue;
+       if(Border_Points.empty()) continue;
 
-           for(const NeuronSWC & Border_Point:Border_Points){//absolute
-               bool used=false;
-               for(const NeuronSWC & swc:used_swc){
-                   if(distance_square(swc,Border_Point)<identical_threshold){
-                       used=true;
-                   }
-               }
-               if(used) continue;
-
-               XYZ vc=(XYZ(Border_Point)-XYZ(Absolute_Marker));
-
-               qDebug()<<vc.x<<" "<<vc.y<<" "<<vc.z;
-
-               std::vector<int> direction=Judge_Direction(XYZ(Border_Point)-XYZ(Absolute_Marker));
-
-               //calculate the new center of next round DFS
-               CellAPO New_Point;
-               int offset=blocksize/2-2;
-               //the location of Absolute_Border_Location is float, round this float to int
-               New_Point.x=int(Border_Point.x+0.5);
-               New_Point.y=int(Border_Point.y+0.5);
-               New_Point.z=int(Border_Point.z+0.5);
-
-               //int dx[6]={1,-1,0,0,0,0};
-               //int dy[6]={0,0,1,-1,0,0};
-               //int dz[6]={0,0,0,0,1,-1};
-               //direction=0 positive axis x       dx= 1, dy= 0, dz= 0
-               //direction=1 negative axis x       dx=-1, dy= 0, dz= 0
-               //direction=2 positive axis y       dx= 0, dy= 1, dz= 0
-               //direction=3 negative axis y       dx= 0, dy=-1, dz= 0
-               //direction=4 positive axis z       dx= 0, dy= 0, dz= 1
-               //direction=5 negative axis z       dx= 0, dy= 0, dz=-1
-               //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
-
-               ++amount;
-               for(int i=0;i<3;++i){
-                   CellAPO New_Point_Offset=New_Point;
-                   New_Point_Offset.x+=dx[direction[i]]*offset;
-                   New_Point_Offset.y+=dy[direction[i]]*offset;
-                   New_Point_Offset.z+=dz[direction[i]]*offset;
-                   //calculate the marker in the next bounding_box
-                   ImageMarker New_Marker;
-                   //Border_Point's relative position to the center of next bounding_box decrease or increase in the opposite direction
-                   New_Marker.x=blocksize/2-dx[direction[i]]*offset;
-                   New_Marker.y=blocksize/2-dy[direction[i]]*offset;
-                   New_Marker.z=blocksize/2-dz[direction[i]]*offset;
-
-                   qDebug()<<"New_Point_Offset:"<<New_Point_Offset.x<<" "<<New_Point_Offset.y<<" "<<New_Point_Offset.z;
-                   qDebug()<<"New_Marker:"<<New_Marker.x<<" "<<New_Marker.y<<" "<<New_Marker.z;
-
-
-                   int new_id=amount;
-                   has_extend[center_id]=true;
-                   bbox_queue.push_back(bbox_extend(new_id,New_Point_Offset,New_Marker));
-               }
-
-           }
-       }
-       else{
-           //treat with the border point
-           for(std::pair<NeuronSWC,QQueue<XYZ> > & unsecure:Border_Point_Vector){
-
-               //we think the father of the furthest inaccurate is real Border_Point
-               //        const NeuronSWC & Border_Point=mp[unsecure.first.pn];
-
-               const NeuronSWC & Border_Point=unsecure.first;
-
-
-               //at first, judge if this point as been searched before
-               //decide whether to search or not
-               //Border_Point_Location transform checked(ok)
-               NeuronSWC Absolute_Border_Location;
-               Absolute_Border_Location.x=centerAPO.x-blocksize/2+Border_Point.x;
-               Absolute_Border_Location.y=centerAPO.y-blocksize/2+Border_Point.y;
-               Absolute_Border_Location.z=centerAPO.z-blocksize/2+Border_Point.z;
-               //this operation succeed in avoiding redundancy to some extent
-               bool used=false;
-               for(const NeuronSWC & swc:used_swc){
-                   if(distance_square(swc,Absolute_Border_Location)<identical_threshold){
-                       used=true;
-                   }
-               }
-               if(used) continue;
-
-               //judge the direction to expand(undetermined)
-               QQueue<XYZ> & Vectors=unsecure.second;
-               //        Vectors.pop_back(); //don't take the last inaccuracy line into consideration
-               //take the mean(ok)
-               XYZ mean=XYZ(0.0,0.0,0.0);
-               for(const XYZ & i:Vectors){
-                   mean=mean+i;
-               }
-               int sz=Vectors.size();
-               mean=mean/XYZ(sz);
-               //judge direction by mean(recommend to read)
-               std::vector<int> direction=Judge_Direction(mean);
-
-               //calculate the new center of next round DFS
-               CellAPO New_Point;
-               int offset=blocksize/2-2;
-               //the location of Absolute_Border_Location is float, round this float to int
-               New_Point.x=int(Absolute_Border_Location.x+0.5);
-               New_Point.y=int(Absolute_Border_Location.y+0.5);
-               New_Point.z=int(Absolute_Border_Location.z+0.5);
-
-               //int dx[6]={1,-1,0,0,0,0};
-               //int dy[6]={0,0,1,-1,0,0};
-               //int dz[6]={0,0,0,0,1,-1};
-               //direction=0 positive axis x       dx= 1, dy= 0, dz= 0
-               //direction=1 negative axis x       dx=-1, dy= 0, dz= 0
-               //direction=2 positive axis y       dx= 0, dy= 1, dz= 0
-               //direction=3 negative axis y       dx= 0, dy=-1, dz= 0
-               //direction=4 positive axis z       dx= 0, dy= 0, dz= 1
-               //direction=5 negative axis z       dx= 0, dy= 0, dz=-1
-               //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
-
-               ++amount;
-               for(int i=0;i<5;++i){
-                   CellAPO New_Point_Offset=New_Point;
-                   New_Point_Offset.x+=dx[direction[i]]*offset;
-                   New_Point_Offset.y+=dy[direction[i]]*offset;
-                   New_Point_Offset.z+=dz[direction[i]]*offset;
-                   //calculate the marker in the next bounding_box
-                   ImageMarker New_Marker;
-                   //Border_Point's relative position to the center of next bounding_box decrease or increase in the opposite direction
-                   New_Marker.x=blocksize/2-dx[direction[i]]*offset;
-                   New_Marker.y=blocksize/2-dy[direction[i]]*offset;
-                   New_Marker.z=blocksize/2-dz[direction[i]]*offset;
-                   qDebug()<<"New_Point_Offset:"<<New_Point_Offset.x<<" "<<New_Point_Offset.y<<" "<<New_Point_Offset.z;
-                   qDebug()<<"New_Marker:"<<New_Marker.x<<" "<<New_Marker.y<<" "<<New_Marker.z;
-
-
-                   int new_id=amount;
-                   has_extend[center_id]=true;
-                   bbox_queue.push_back(bbox_extend(new_id,New_Point_Offset,New_Marker));
+       for(const NeuronSWC & Border_Point:Border_Points){//absolute
+           bool used=false;
+           for(const NeuronSWC & swc:used_swc){
+               if(distance_square(swc,Border_Point)<identical_threshold){
+                   used=true;
                }
            }
+           if(used) continue;
+
+           XYZ vc=(XYZ(Border_Point)-XYZ(Absolute_Marker));
+
+           qDebug()<<vc.x<<" "<<vc.y<<" "<<vc.z;
+
+           std::vector<int> direction=Judge_Direction(XYZ(Border_Point)-XYZ(Absolute_Marker));
+
+           //calculate the new center of next round DFS
+           CellAPO New_Point;
+           int offset=blocksize/2-2;
+           //the location of Absolute_Border_Location is float, round this float to int
+           New_Point.x=int(Border_Point.x+0.5);
+           New_Point.y=int(Border_Point.y+0.5);
+           New_Point.z=int(Border_Point.z+0.5);
+
+           //int dx[6]={1,-1,0,0,0,0};
+           //int dy[6]={0,0,1,-1,0,0};
+           //int dz[6]={0,0,0,0,1,-1};
+           //direction=0 positive axis x       dx= 1, dy= 0, dz= 0
+           //direction=1 negative axis x       dx=-1, dy= 0, dz= 0
+           //direction=2 positive axis y       dx= 0, dy= 1, dz= 0
+           //direction=3 negative axis y       dx= 0, dy=-1, dz= 0
+           //direction=4 positive axis z       dx= 0, dy= 0, dz= 1
+           //direction=5 negative axis z       dx= 0, dy= 0, dz=-1
+           //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
+
+           ++amount;
+           for(int i=0;i<3;++i){
+               CellAPO New_Point_Offset=New_Point;
+               New_Point_Offset.x+=dx[direction[i]]*offset;
+               New_Point_Offset.y+=dy[direction[i]]*offset;
+               New_Point_Offset.z+=dz[direction[i]]*offset;
+               //calculate the marker in the next bounding_box
+               ImageMarker New_Marker;
+               //Border_Point's relative position to the center of next bounding_box decrease or increase in the opposite direction
+               New_Marker.x=blocksize/2-dx[direction[i]]*offset;
+               New_Marker.y=blocksize/2-dy[direction[i]]*offset;
+               New_Marker.z=blocksize/2-dz[direction[i]]*offset;
+
+               qDebug()<<"New_Point_Offset:"<<New_Point_Offset.x<<" "<<New_Point_Offset.y<<" "<<New_Point_Offset.z;
+               qDebug()<<"New_Marker:"<<New_Marker.x<<" "<<New_Marker.y<<" "<<New_Marker.z;
+
+
+               int new_id=amount;
+               has_extend[center_id]=true;
+               bbox_queue.push_back(bbox_extend(new_id,New_Point_Offset,New_Marker));
+           }
+
        }
     }
 
