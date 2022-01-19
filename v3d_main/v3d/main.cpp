@@ -788,19 +788,19 @@ struct marker_with_intensity{
     }
 };
 
-QVector<ImageMarker> Get_Valid_Marker(const QString & v3draw_File,const ImageMarker & startPoint,const int & blocksize){
+std::pair<QVector<ImageMarker>,QVector<ImageMarker> > Get_Valid_Marker(const QString & v3draw_File,const ImageMarker & startPoint,const int & blocksize){
     Image4DSimple p4dImage;
     p4dImage.loadImage(v3draw_File.toStdString().c_str(),true);
     unsigned char * indata1d = p4dImage.getRawDataAtChannel(0);
-    double mean=0;
 
-    const int range=10;
+    std::pair<QVector<ImageMarker>,QVector<ImageMarker> > ret;
+
+    const int range=3;
     QVector<int> d={0};
     for(int i=1;i<=range;++i){
         d.push_back(i);
         d.push_back(-i);
     }
-    unsigned char mx=-1;
     std::priority_queue<marker_with_intensity> q;
     if(startPoint.x!=blocksize/2){
         for(int i=0;i<d.size();++i){
@@ -865,11 +865,90 @@ QVector<ImageMarker> Get_Valid_Marker(const QString & v3draw_File,const ImageMar
             }
         }
     }
-    QVector<ImageMarker> ret;
-    for(int i=0;i<10;++i){
-        ret.push_back(q.top().marker);
+    QVector<ImageMarker> ret1;
+    for(int i=0;i<5;++i){
+        ret1.push_back(q.top().marker);
         q.pop();
     }
+
+    const int low=4;
+    const int high=10;
+    d.clear();
+    for(int i=low;i<=high;++i){
+        d.push_back(i);
+        d.push_back(-i);
+    }
+    q=std::priority_queue<marker_with_intensity>();
+    if(startPoint.x!=blocksize/2){
+        for(int i=0;i<d.size();++i){
+            for(int j=0;j<=i;++j){
+                const int & d1=d[i];
+                const int & d2=d[j];
+                ImageMarker new_marker=startPoint;
+                new_marker.y+=d1;
+                new_marker.z+=d2;
+                unsigned idx=Get_Marker_Idx(new_marker,blocksize);
+                q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+                new_marker=startPoint;
+                new_marker.z+=d1;
+                new_marker.y+=d2;
+                idx=Get_Marker_Idx(new_marker,blocksize);
+                q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+            }
+        }
+    }else{
+        if(startPoint.y!=blocksize/2){
+            for(int i=0;i<d.size();++i){
+                for(int j=0;j<=i;++j){
+                    const int & d1=d[i];
+                    const int & d2=d[j];
+                    ImageMarker new_marker=startPoint;
+                    new_marker.x+=d1;
+                    new_marker.z+=d2;
+                    unsigned idx=Get_Marker_Idx(new_marker,blocksize);
+                    q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+                    new_marker=startPoint;
+                    new_marker.z+=d1;
+                    new_marker.x+=d2;
+                    idx=Get_Marker_Idx(new_marker,blocksize);
+                    q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+                }
+            }
+        }else{
+            if(startPoint.z!=blocksize/2){
+                for(int i=0;i<d.size();++i){
+                    for(int j=0;j<=i;++j){
+                        const int & d1=d[i];
+                        const int & d2=d[j];
+                        ImageMarker new_marker=startPoint;
+                        new_marker.x+=d1;
+                        new_marker.y+=d2;
+                        unsigned idx=Get_Marker_Idx(new_marker,blocksize);
+                        q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+
+                        new_marker=startPoint;
+                        new_marker.y+=d1;
+                        new_marker.x+=d2;
+                        idx=Get_Marker_Idx(new_marker,blocksize);
+                        q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+                    }
+                }
+            }
+        }
+    }
+    QVector<ImageMarker> ret2;
+    for(int i=0;i<10;++i){
+        ret2.push_back(q.top().marker);
+        q.pop();
+    }
+    ret.first=ret1;
+    ret.second=ret2;
     return ret;
 }
 
@@ -932,17 +1011,39 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                <<"/f"<<"adath"<<"/i"<<Work_Dir+QString("/testV3draw/")+rawFileName<<"/o"<<QString(Work_Dir+QString("/testV3draw/thres_")+rawFileName));
 
         ImageMarker startPointBackup=startPoint;
+        NeuronTree Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize);
 
-        NeuronTree App2_Tree;
+        NeuronTree App2_Tree=NeuronTree();
 //        if(center_id!=0)   App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,rawFileName);
         if(center_id!=0){
-            QVector<ImageMarker> possible=Get_Valid_Marker(Work_Dir+QString("/testV3draw/thres_")+rawFileName,startPoint,blocksize);
-            QList<ImageMarker> List_Marker_Write;
-            for(const ImageMarker & i:possible){
+
+            std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(Work_Dir+QString("/testV3draw/thres_")+rawFileName,startPoint,blocksize);
+            for(const ImageMarker & i:possible.first){
                 startPoint=i;
                 App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
                 if(!App2_Tree.listNeuron.empty()){
+                    V_NeuronSWC_list V_Answer_Tree = NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
+                    V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
+                    if(!Check_Tree_Identical(V_Answer_Tree,V_App2_Tree)){
+                        App2_Tree=NeuronTree();
+                        continue;
+                    }
                     break;
+                }
+            }
+            if(App2_Tree.listNeuron.empty()){
+                for(const ImageMarker & i:possible.second){
+                    startPoint=i;
+                    App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+                    if(!App2_Tree.listNeuron.empty()){
+                        V_NeuronSWC_list V_Answer_Tree = NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
+                        V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
+                        if(!Check_Tree_Identical(V_Answer_Tree,V_App2_Tree)){
+                            App2_Tree=NeuronTree();
+                            continue;
+                        }
+                        break;
+                    }
                 }
             }
 
@@ -969,7 +1070,6 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
 
        //readfile(ok)
        qDebug()<<"readfile";
-       NeuronTree Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize);
        update_Ans_used(Answer_Tree);
        bool use_answer=false;
        if(Answer_Tree.listNeuron.empty()) continue;
