@@ -60,6 +60,7 @@ Last update: 2011-08-25: remove some uncalled old code, and adjust the inconsist
 #include <unordered_map>
 #include <unordered_set>
 #include <cstdio>
+#include <queue>
 
 #include "mainwindow.h"
 #include "v3d_application.h"
@@ -151,7 +152,7 @@ struct bbox_extend{
 
 QString Res_Path="G:/18454/RES(26298x35000x11041)";
 QString Vaa3d_App_Path="C:/3.603c";
-QString Work_Dir="G:/work_dir_new";
+QString Work_Dir="G:/work_dir_debug";
 QString Answer_File="G:/18454_answer/whole_image.eswc";
 QMap<int,QVector<int> > Answer_Graph;
 QMap<int,NeuronSWC> Answer_Map;
@@ -171,7 +172,7 @@ QVector<NeuronSWC> used_swc;
 int X=14530,Y=10693,Z=3124;
 double close_distance=4;
 double identical_threshold=300;   //(undetermined)
-double seg_identical_threshold=500;
+double seg_identical_threshold=200;
 double Border_Threshold=50;
 
 double distance_square(const NeuronSWC & point_a,const NeuronSWC & point_b){
@@ -631,6 +632,11 @@ void init(const QString & Answer_File){
 
     Ans_Tree=readSWC_file(Answer_File);
     for(const NeuronSWC & i:Ans_Tree.listNeuron){
+        if(i.type==1){
+            X=i.x;
+            Y=i.y;
+            Z=i.z;
+        }
         Answer_Map[i.n]=i;
         if(i.pn>0 && i.n>0){
             Answer_Graph[i.n].push_back(i.pn);
@@ -765,6 +771,108 @@ NeuronTree Find_Valid_App2_Tree(const CellAPO & centerAPO,ImageMarker & startPoi
    return ret;
 }
 
+unsigned Get_Marker_Idx(const int & x,const int & y,const int & z,const int & blocksize){
+    return z*blocksize*blocksize+y*blocksize+x;
+}
+
+unsigned Get_Marker_Idx(const ImageMarker & startPoint,const int & blocksize){
+    return Get_Marker_Idx(startPoint.x,startPoint.y,startPoint.z,blocksize);
+}
+
+struct marker_with_intensity{
+    ImageMarker marker;
+    unsigned char intensity;
+    marker_with_intensity(const ImageMarker & marker_,const unsigned char & intensity_):marker(marker_),intensity(intensity_){}
+    bool operator < (const marker_with_intensity & cmp) const{
+        return intensity<cmp.intensity;
+    }
+};
+
+QVector<ImageMarker> Get_Valid_Marker(const QString & v3draw_File,const ImageMarker & startPoint,const int & blocksize){
+    Image4DSimple p4dImage;
+    p4dImage.loadImage(v3draw_File.toStdString().c_str(),true);
+    unsigned char * indata1d = p4dImage.getRawDataAtChannel(0);
+    double mean=0;
+
+    const int range=10;
+    QVector<int> d={0};
+    for(int i=1;i<=range;++i){
+        d.push_back(i);
+        d.push_back(-i);
+    }
+    unsigned char mx=-1;
+    std::priority_queue<marker_with_intensity> q;
+    if(startPoint.x!=blocksize/2){
+        for(int i=0;i<d.size();++i){
+            for(int j=0;j<=i;++j){
+                const int & d1=d[i];
+                const int & d2=d[j];
+                ImageMarker new_marker=startPoint;
+                new_marker.y+=d1;
+                new_marker.z+=d2;
+                unsigned idx=Get_Marker_Idx(new_marker,blocksize);
+                q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+                new_marker=startPoint;
+                new_marker.z+=d1;
+                new_marker.y+=d2;
+                idx=Get_Marker_Idx(new_marker,blocksize);
+                q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+            }
+        }
+    }else{
+        if(startPoint.y!=blocksize/2){
+            for(int i=0;i<d.size();++i){
+                for(int j=0;j<=i;++j){
+                    const int & d1=d[i];
+                    const int & d2=d[j];
+                    ImageMarker new_marker=startPoint;
+                    new_marker.x+=d1;
+                    new_marker.z+=d2;
+                    unsigned idx=Get_Marker_Idx(new_marker,blocksize);
+                    q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+                    new_marker=startPoint;
+                    new_marker.z+=d1;
+                    new_marker.x+=d2;
+                    idx=Get_Marker_Idx(new_marker,blocksize);
+                    q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+                }
+            }
+        }else{
+            if(startPoint.z!=blocksize/2){
+                for(int i=0;i<d.size();++i){
+                    for(int j=0;j<=i;++j){
+                        const int & d1=d[i];
+                        const int & d2=d[j];
+                        ImageMarker new_marker=startPoint;
+                        new_marker.x+=d1;
+                        new_marker.y+=d2;
+                        unsigned idx=Get_Marker_Idx(new_marker,blocksize);
+                        q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+
+                        new_marker=startPoint;
+                        new_marker.y+=d1;
+                        new_marker.x+=d2;
+                        idx=Get_Marker_Idx(new_marker,blocksize);
+                        q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+                    }
+                }
+            }
+        }
+    }
+    QVector<ImageMarker> ret;
+    for(int i=0;i<10;++i){
+        ret.push_back(q.top().marker);
+        q.pop();
+    }
+    return ret;
+}
+
 void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & Start_z,const int & blocksize,const QString & File_Name){
 
     init(Answer_File);
@@ -826,7 +934,21 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
         ImageMarker startPointBackup=startPoint;
 
         NeuronTree App2_Tree;
-        if(center_id!=0)   App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,rawFileName);
+//        if(center_id!=0)   App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,rawFileName);
+        if(center_id!=0){
+            QVector<ImageMarker> possible=Get_Valid_Marker(Work_Dir+QString("/testV3draw/thres_")+rawFileName,startPoint,blocksize);
+            QList<ImageMarker> List_Marker_Write;
+            for(const ImageMarker & i:possible){
+                startPoint=i;
+                App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+                if(!App2_Tree.listNeuron.empty()){
+                    break;
+                }
+            }
+
+           QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
+           QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
+        }
         else {
             App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
             QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
@@ -1040,6 +1162,8 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
     writeSWC_file(Work_Dir+QString("/")+File_Name,output);
 }
 
+
+
 int main(int argc, char **argv)
 {
     int blocksize=256;
@@ -1057,33 +1181,33 @@ int main(int argc, char **argv)
         if(i==4){
             Answer_File=QString::fromStdString((string(argv[i])));
         }
-        if(i==5){
-            X=atoi(argv[i]);
-        }
-        if(i==6){
-            Y=atoi(argv[i]);
-        }
-        if(i==7){
-            Z=atoi(argv[i]);
-        }
-        if(i==8){
-            blocksize=atoi(argv[i]);
-        }
-        if(i==9){
-            close_distance=atof(argv[i]);
-        }
-        if(i==10){
-            identical_threshold=atof(argv[i]);
-        }
-        if(i==11){
-            seg_identical_threshold=atof(argv[i]);
-        }
-        if(i==12){
-            Border_Threshold=atof(argv[i]);
-        }
-        if(i==13){
-            Output_File_Name=QString::fromStdString((string(argv[i])));
-        }
+//        if(i==5){
+//            X=atoi(argv[i]);
+//        }
+//        if(i==6){
+//            Y=atoi(argv[i]);
+//        }
+//        if(i==7){
+//            Z=atoi(argv[i]);
+//        }
+//        if(i==8){
+//            blocksize=atoi(argv[i]);
+//        }
+//        if(i==9){
+//            close_distance=atof(argv[i]);
+//        }
+//        if(i==10){
+//            identical_threshold=atof(argv[i]);
+//        }
+//        if(i==11){
+//            seg_identical_threshold=atof(argv[i]);
+//        }
+//        if(i==12){
+//            Border_Threshold=atof(argv[i]);
+//        }
+//        if(i==13){
+//            Output_File_Name=QString::fromStdString((string(argv[i])));
+//        }
     }
 
     App2_non_recursive_DFS(X,Y,Z,blocksize,Output_File_Name);
