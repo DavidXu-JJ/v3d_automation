@@ -172,7 +172,7 @@ QVector<NeuronSWC> used_swc;
 
 int X=14530,Y=10693,Z=3124;
 double close_distance=4;
-double identical_threshold=50;   //(undetermined)
+double identical_threshold=300;   //(undetermined)
 double seg_identical_threshold=200;
 double Border_Threshold=50;
 
@@ -955,6 +955,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
 
     while(!bbox_queue.empty()||!if_finish()){
         if(bbox_queue.empty()){
+            used_swc.clear();
             has_extend.clear();
             amount=0;
             int id=unused_id();
@@ -1014,7 +1015,6 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
         NeuronTree App2_Tree=NeuronTree();
         if(center_id!=0){
             QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
-            App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
             if(App2_Tree.listNeuron.empty()){
                 std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(v3draw,startPoint,blocksize);
                 for(const ImageMarker & i:possible.first){
@@ -1042,6 +1042,9 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                             break;
                         }
                     }
+                }
+                if(App2_Tree.listNeuron.empty()){
+                     App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
                 }
             }
 
@@ -1210,7 +1213,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
 
            ++amount;
-           for(int i=0;i<5;++i){
+           for(int i=0;i<3;++i){
                CellAPO New_Point_Offset=New_Point;
                New_Point_Offset.x+=dx[direction[i]]*offset;
                New_Point_Offset.y+=dy[direction[i]]*offset;
