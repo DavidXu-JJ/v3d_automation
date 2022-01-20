@@ -955,7 +955,6 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
 
     while(!bbox_queue.empty()||!if_finish()){
         if(bbox_queue.empty()){
-            used_swc.clear();
             has_extend.clear();
             amount=0;
             int id=unused_id();
