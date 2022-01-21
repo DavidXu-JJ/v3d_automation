@@ -999,7 +999,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
     bbox_queue.push_back(bbox_extend(0,init_centerAPO,init_startPoint,rt_id));
 
     while(!bbox_queue.empty()||!if_finish()){
-        if(not_change==10){
+        if(not_change==15){
             not_change=0;
             bbox_queue.clear();
         }
@@ -1102,8 +1102,11 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
         }
         else {
-            QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
-            App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
+            App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+            if(App2_Tree.listNeuron.empty()){
+               QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
+               App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
+            }
             QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
             QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
         }
