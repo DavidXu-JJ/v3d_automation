@@ -288,10 +288,10 @@ bool Check_Seg_Identical(const V_NeuronSWC & Check_Seg,const V_NeuronSWC_list & 
             mx=std::max(mx,Distance_Unit_To_Seg(Check_Point,Answer_Seg));
         }
     }
-    qDebug()<<"check_mx:"<<mx;
     return mx<seg_identical_threshold;
 }
 bool Check_Tree_Identical(const V_NeuronSWC_list & Check_Tree,const V_NeuronSWC_list & Answer_Tree){
+    if(Answer_Tree.seg.empty()) return false;
     bool flag=true;
     for(const V_NeuronSWC & Check_Seg:Check_Tree.seg){
         flag&=Check_Seg_Identical(Check_Seg,Answer_Tree);
@@ -942,6 +942,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
     V_NeuronSWC_list App2_Generate;
 
     int amount=0;
+    int not_change=0;
     QQueue<bbox_extend> bbox_queue;
     QMap<int,bool> has_extend;
     int rt_id=1;
@@ -954,6 +955,10 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
     bbox_queue.push_back(bbox_extend(0,init_centerAPO,init_startPoint,rt_id));
 
     while(!bbox_queue.empty()||!if_finish()){
+        if(not_change==10){
+            not_change=0;
+            bbox_queue.clear();
+        }
         if(bbox_queue.empty()){
             vis.clear();
             has_extend.clear();
@@ -1009,6 +1014,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
 
         ImageMarker startPointBackup=startPoint;
         NeuronTree Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize,centerSWC);
+        if(Answer_Tree.listNeuron.empty()) continue;
         V_NeuronSWC_list V_Answer_Tree = NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
 
         NeuronTree App2_Tree=NeuronTree();
@@ -1021,7 +1027,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                     App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
                     if(!App2_Tree.listNeuron.empty()){
                         V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
-                        if(!Check_Tree_Identical(V_Answer_Tree,V_App2_Tree)){
+                        if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
                             App2_Tree=NeuronTree();
                             continue;
                         }
@@ -1034,7 +1040,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                         App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
                         if(!App2_Tree.listNeuron.empty()){
                             V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
-                            if(!Check_Tree_Identical(V_Answer_Tree,V_App2_Tree)){
+                            if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
                                 App2_Tree=NeuronTree();
                                 continue;
                             }
@@ -1067,13 +1073,8 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        //readfile(ok)
        update_Ans_used(Answer_Tree);
        bool use_answer=false;
-       if(Answer_Tree.listNeuron.empty()) continue;
        if(App2_Tree.listNeuron.empty()){
-           if(Answer_Tree.listNeuron.empty()){
-               continue;
-           } else{
-               use_answer=true;
-           }
+           use_answer=true;
        }
 
        QMap<int,QVector<int> > son;    //record son
@@ -1110,7 +1111,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                if(Answer_Tree.listNeuron.empty()) continue;
                V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
                //app2 is not accurate
-               if(!Check_Tree_Identical(V_Answer_Tree,V_App2_Tree)){
+               if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
                    use_answer=true;
                    App2_Tree=Answer_Tree;
                }
@@ -1121,6 +1122,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        }
 
        //save the answer(ok)
+       bool if_change=false;
        V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(App2_Tree);
        for(const V_NeuronSWC & Seg:Segments.seg){
            V_NeuronSWC Add_Seg=Seg;
@@ -1155,11 +1157,15 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                    Not_Redundant.row.back().parent=-1;
                    i=now;
                    if(Not_Redundant.row.size()<=2) continue;
+                   if_change=true;
                    App2_Generate.append(Not_Redundant);
 
                }
            }
        }
+
+       if(!if_change)  ++not_change;
+       else not_change=0;
 
        NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
        writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
@@ -1179,6 +1185,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        if(vis.count(now_node)) continue;
 
        vis[now_node]=true;
+
 
        for(const NeuronSWC & Border_Point:Border_Points){//absolute
            bool used=false;
