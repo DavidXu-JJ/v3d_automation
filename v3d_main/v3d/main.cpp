@@ -955,6 +955,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
 
     while(!bbox_queue.empty()||!if_finish()){
         if(bbox_queue.empty()){
+            vis.clear();
             has_extend.clear();
             amount=0;
             int id=unused_id();
@@ -983,7 +984,6 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
         qDebug()<<"start DFS,center_id="<<center_id;
 
         node now_node=node(centerAPO.x,centerAPO.y,centerAPO.z,startPoint.x,startPoint.y,startPoint.z);
-        if(vis.count(now_node)) continue;
 
         //drop apo file(ok)
         QList<CellAPO> List_APO_Write;
@@ -1062,8 +1062,6 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
         Absolute_Marker.x+=centerAPO.x-blocksize/2;
         Absolute_Marker.y+=centerAPO.y-blocksize/2;
         Absolute_Marker.z+=centerAPO.z-blocksize/2;
-
-       vis[now_node]=true;
 
 
        //readfile(ok)
@@ -1178,6 +1176,9 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        used_swc.push_back(Start_Marker_Location);
 
        if(Border_Points.empty()) continue;
+       if(vis.count(now_node)) continue;
+
+       vis[now_node]=true;
 
        for(const NeuronSWC & Border_Point:Border_Points){//absolute
            bool used=false;
