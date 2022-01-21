@@ -225,6 +225,23 @@ void update_Ans_used(const NeuronTree & updateTree){
     }
 }
 
+void update_Ans_used(const NeuronSWC & update){
+    Ans_used[update.n]=true;
+}
+
+NeuronTree Get_Ans_In_BBox(const CellAPO & centerAPO,const int & blocksize){
+    NeuronTree ret;
+    const int & X=centerAPO.x;
+    const int & Y=centerAPO.y;
+    const int & Z=centerAPO.z;
+    for(const NeuronSWC & swc:Ans_Tree.listNeuron){
+        if(between(swc.x,X-blocksize/2,X+blocksize/2)&&between(swc.y,Y-blocksize/2,Y+blocksize/2)&&between(swc.z,Z-blocksize/2,Z+blocksize/2)){
+            ret.listNeuron.push_back(swc);
+        }
+    }
+    return ret;
+}
+
 
 double distance_XYZ(const XYZ & p1,const XYZ & p2){
     XYZ vec=p2-p1;
@@ -656,6 +673,33 @@ NeuronTree Find_Valid_App2_Tree(const CellAPO & centerAPO,ImageMarker & startPoi
         d.push_back(-2*i);
     }
     NeuronTree ret;
+    std::map<std::tuple<int,int,int>,bool> mp;
+    if(startPoint.x==blocksize/2 && startPoint.y==blocksize/2 &&startPoint.z==blocksize/2){
+        for(int i=0;i<d.size();++i){
+            for(int j=0;j<d.size();++j){
+                for(int k=0;k<d.size();++k){
+                    if(mp.count(std::tuple<int,int,int> (d[i],d[j],d[k]))) continue;
+                    mp[std::tuple<int,int,int> (d[i],d[j],d[k])]=true;
+                    ImageMarker new_marker=startPoint;
+                    new_marker.x+=d[i];
+                    new_marker.y+=d[j];
+                    new_marker.z+=d[k];
+                    ret=Vanilla_App2(centerAPO,new_marker,blocksize,rawFileName);
+                    if(!ret.listNeuron.empty()){
+                        startPoint=new_marker;
+                        break;
+                    }
+                }
+                if(!ret.listNeuron.empty()){
+                    break;
+                }
+            }
+            if(!ret.listNeuron.empty()){
+                break;
+            }
+        }
+        return ret;
+    }
     if(startPoint.x!=blocksize/2){
         for(int i=0;i<d.size();++i){
             for(int j=0;j<=i;++j){
@@ -960,12 +1004,14 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
             bbox_queue.clear();
         }
         if(bbox_queue.empty()){
+            used_swc.clear();
             vis.clear();
             has_extend.clear();
             amount=0;
             int id=unused_id();
             CellAPO centerAPO;
             const NeuronSWC & swc=Answer_Map[id];
+            update_Ans_used(swc);
             centerAPO.x=swc.x;
             centerAPO.y=swc.y;
             centerAPO.z=swc.z;
@@ -1020,9 +1066,21 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
         NeuronTree App2_Tree=NeuronTree();
         if(center_id!=0){
             QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
+            std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(v3draw,startPoint,blocksize);
+            for(const ImageMarker & i:possible.first){
+                startPoint=i;
+                App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+                if(!App2_Tree.listNeuron.empty()){
+                    V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
+                    if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
+                        App2_Tree=NeuronTree();
+                        continue;
+                    }
+                    break;
+                }
+            }
             if(App2_Tree.listNeuron.empty()){
-                std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(v3draw,startPoint,blocksize);
-                for(const ImageMarker & i:possible.first){
+                for(const ImageMarker & i:possible.second){
                     startPoint=i;
                     App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
                     if(!App2_Tree.listNeuron.empty()){
@@ -1034,30 +1092,18 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                         break;
                     }
                 }
-                if(App2_Tree.listNeuron.empty()){
-                    for(const ImageMarker & i:possible.second){
-                        startPoint=i;
-                        App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
-                        if(!App2_Tree.listNeuron.empty()){
-                            V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
-                            if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
-                                App2_Tree=NeuronTree();
-                                continue;
-                            }
-                            break;
-                        }
-                    }
-                }
-                if(App2_Tree.listNeuron.empty()){
-                     App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
-                }
             }
+            if(App2_Tree.listNeuron.empty()){
+                 App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
+            }
+
 
            QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
            QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
         }
         else {
-            App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+            QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
+            App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
             QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
             QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
         }
@@ -1108,7 +1154,6 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            }
 
            if(center_id>0){
-               if(Answer_Tree.listNeuron.empty()) continue;
                V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
                //app2 is not accurate
                if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
@@ -1119,6 +1164,10 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        }
        else{
            App2_Tree=Answer_Tree;
+       }
+
+       if(use_answer && center_id==0){
+           update_Ans_used(Get_Ans_In_BBox(centerAPO,blocksize));
        }
 
        //save the answer(ok)
