@@ -1077,11 +1077,49 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
         QFile crop_file(Work_Dir+QString("/testV3draw/")+rawFileName);
         if(v3draw_size==-1){
             v3draw_size=crop_file.size();
-            qDebug()<<"v3draw:"<<v3draw_size;
         }
         else {
-            qDebug()<<"v3draw:"<<crop_file.size();
             if(crop_file.size()!=v3draw_size){
+                NeuronTree Ans_In_BBox=Get_Ans_In_BBox(centerAPO,blocksize);
+                V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(Ans_In_BBox);
+                for(const V_NeuronSWC & Seg:Segments.seg){
+                    V_NeuronSWC Add_Seg=Seg;
+                    QMap<int,bool> redundant;
+                    for(int i=0; i<Add_Seg.row.size();++i){
+                        //(ok)
+                        V_NeuronSWC_unit & swc=Add_Seg.row[i];
+                        swc.x+=centerAPO.x-blocksize/2;
+                        swc.y+=centerAPO.y-blocksize/2;
+                        swc.z+=centerAPO.z-blocksize/2;
+                        if(App2_Generate.seg.empty()) continue;
+                        if(Distance_Unit_To_Tree(swc,App2_Generate)<close_distance){
+                            redundant[i]=true;
+                        }
+                    }
+
+                    for(int i=0;i<Add_Seg.row.size();++i){
+                        if(!redundant.count(i)){
+                            V_NeuronSWC Not_Redundant;
+                            int now=i;
+                            int amount=0;
+                            while(now<Add_Seg.row.size() && !redundant.count(now)){
+                                V_NeuronSWC_unit unit=Add_Seg.row[now];
+                                ++amount;
+                                unit.type=3;
+                                unit.n=amount;
+                                unit.parent=amount+1;
+                                Not_Redundant.row.push_back(unit);
+                                ++now;
+                            }
+                            Not_Redundant.row.back().parent=-1;
+                            i=now;
+                            if(Not_Redundant.row.size()<=2) continue;
+                            App2_Generate.append(Not_Redundant);
+
+                        }
+                    }
+                }
+                update_Ans_used(Ans_In_BBox);
                 continue;
             }
         }
