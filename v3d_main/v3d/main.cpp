@@ -193,6 +193,24 @@ bool if_finish(){
     }
     return cnt>=Ans_Tree.listNeuron.size();
 }
+//int unused_id(){
+//    int id=-1;
+//    double mxdis=-1e8;
+//    for(const NeuronSWC & i:Ans_Tree.listNeuron){
+//        if(!Ans_used.count(i.n)){
+//            double now_mx=-1e8;
+//            for(auto it=Ans_used.begin();it!=Ans_used.end();++it){
+//                now_mx=std::max(now_mx,distance_square(Answer_Map[it.key()],i));
+//            }
+//            if(mxdis<now_mx){
+//                mxdis=now_mx;
+//                id=i.n;
+//            }
+//        }
+//    }
+//    return id;
+//}
+
 int unused_id(){
     int id=-1;
     for(const NeuronSWC & i:Ans_Tree.listNeuron){
@@ -202,6 +220,7 @@ int unused_id(){
     }
     return id;
 }
+
 bool if_need_extend(const CellAPO & centerAPO,const int & blocksize){
     const int & X=centerAPO.x;
     const int & Y=centerAPO.y;
@@ -987,6 +1006,8 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
 
     int amount=0;
     int not_change=0;
+    int max_not_change=20;
+    unsigned long long v3draw_size=-1;
     QQueue<bbox_extend> bbox_queue;
     QMap<int,bool> has_extend;
     int rt_id=1;
@@ -999,9 +1020,10 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
     bbox_queue.push_back(bbox_extend(0,init_centerAPO,init_startPoint,rt_id));
 
     while(!bbox_queue.empty()||!if_finish()){
-        if(not_change==15){
+        if(not_change==max_not_change){
             not_change=0;
             bbox_queue.clear();
+            max_not_change=5;
         }
         if(bbox_queue.empty()){
             used_swc.clear();
@@ -1012,9 +1034,9 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
             CellAPO centerAPO;
             const NeuronSWC & swc=Answer_Map[id];
             update_Ans_used(swc);
-            centerAPO.x=swc.x;
-            centerAPO.y=swc.y;
-            centerAPO.z=swc.z;
+            centerAPO.x=int(swc.x+0.5);
+            centerAPO.y=int(swc.y+0.5);
+            centerAPO.z=int(swc.z+0.5);
             ImageMarker startPoint;
             startPoint.x=blocksize/2;
             startPoint.y=blocksize/2;
@@ -1051,6 +1073,18 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                <<"/x"<<Vaa3d_App_Path+QString("/plugins/image_geometry/crop3d_image_series/cropped3DImageSeries.dll")
                <<"/f"<<"cropTerafly"<<"/i"<<Res_Path<<APO_File_Name<<Work_Dir+QString("/testV3draw/")
                <<"/p"<<QString::number(blocksize)<<QString::number(blocksize)<<QString::number(blocksize));
+
+        QFile crop_file(Work_Dir+QString("/testV3draw/")+rawFileName);
+        if(v3draw_size==-1){
+            v3draw_size=crop_file.size();
+            qDebug()<<"v3draw:"<<v3draw_size;
+        }
+        else {
+            qDebug()<<"v3draw:"<<crop_file.size();
+            if(crop_file.size()!=v3draw_size){
+                continue;
+            }
+        }
 
         //ada(ok)
         qDebug()<<"ada:"
@@ -1096,7 +1130,6 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
             if(App2_Tree.listNeuron.empty()){
                  App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
             }
-
 
            QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
            QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
@@ -1300,7 +1333,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
 
 int main(int argc, char **argv)
 {
-    int blocksize=256;
+    int blocksize=128;
     QString Output_File_Name="whole_image.eswc";
     for(int i=0;i<argc;++i){
         if(i==1){
