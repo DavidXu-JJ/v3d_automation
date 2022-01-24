@@ -848,6 +848,29 @@ std::pair<QVector<ImageMarker>,QVector<ImageMarker> > Get_Valid_Marker(const QSt
         d.push_back(-i);
     }
     std::priority_queue<marker_with_intensity> q;
+    std::map<std::tuple<int,int,int>,bool> mp;
+    if(startPoint.x==blocksize/2 && startPoint.y==blocksize/2 &&startPoint.z==blocksize/2){
+        for(int i=0;i<d.size();++i){
+            for(int j=0;j<d.size();++j){
+                for(int k=0;k<d.size();++k){
+                    if(mp.count(std::tuple<int,int,int> (d[i],d[j],d[k]))) continue;
+                    mp[std::tuple<int,int,int> (d[i],d[j],d[k])]=true;
+                    ImageMarker new_marker=startPoint;
+                    new_marker.x+=d[i];
+                    new_marker.y+=d[j];
+                    new_marker.z+=d[k];
+                    unsigned idx=Get_Marker_Idx(new_marker,blocksize);
+                    q.push(marker_with_intensity(new_marker,indata1d[idx]));
+                }
+            }
+        }
+        QVector<ImageMarker> ret1;
+        for(int i=0;i<5;++i){
+            ret1.push_back(q.top().marker);
+            q.pop();
+        }
+        return std::make_pair(ret1,QVector<ImageMarker> () );
+    }
     if(startPoint.x!=blocksize/2){
         for(int i=0;i<d.size();++i){
             for(int j=0;j<=i;++j){
@@ -1182,11 +1205,25 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
         }
         else {
-            App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
-            if(App2_Tree.listNeuron.empty()){
-               QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
-               App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
+            QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
+            std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(v3draw,startPoint,blocksize);
+            for(const ImageMarker & i:possible.first){
+                startPoint=i;
+                App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+                if(!App2_Tree.listNeuron.empty()){
+                    V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
+                    if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
+                        App2_Tree=NeuronTree();
+                        continue;
+                    }
+                    break;
+                }
             }
+            if(App2_Tree.listNeuron.empty()){
+                startPoint=startPointBackup;
+                App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+            }
+
             QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
             QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
         }
