@@ -193,33 +193,33 @@ bool if_finish(){
     }
     return cnt>=Ans_Tree.listNeuron.size();
 }
-//int unused_id(){
-//    int id=-1;
-//    double mxdis=-1e8;
-//    for(const NeuronSWC & i:Ans_Tree.listNeuron){
-//        if(!Ans_used.count(i.n)){
-//            double now_mx=-1e8;
-//            for(auto it=Ans_used.begin();it!=Ans_used.end();++it){
-//                now_mx=std::max(now_mx,distance_square(Answer_Map[it.key()],i));
-//            }
-//            if(mxdis<now_mx){
-//                mxdis=now_mx;
-//                id=i.n;
-//            }
-//        }
-//    }
-//    return id;
-//}
-
 int unused_id(){
     int id=-1;
+    double mxdis=-1e8;
     for(const NeuronSWC & i:Ans_Tree.listNeuron){
         if(!Ans_used.count(i.n)){
-            id=i.n;
+            double now_mx=-1e8;
+            for(auto it=Ans_used.begin();it!=Ans_used.end();++it){
+                now_mx=std::max(now_mx,distance_square(Answer_Map[it.key()],i));
+            }
+            if(mxdis<now_mx){
+                mxdis=now_mx;
+                id=i.n;
+            }
         }
     }
     return id;
 }
+
+//int unused_id(){
+//    int id=-1;
+//    for(const NeuronSWC & i:Ans_Tree.listNeuron){
+//        if(!Ans_used.count(i.n)){
+//            id=i.n;
+//        }
+//    }
+//    return id;
+//}
 
 bool if_need_extend(const CellAPO & centerAPO,const int & blocksize){
     const int & X=centerAPO.x;
@@ -903,7 +903,7 @@ std::pair<QVector<ImageMarker>,QVector<ImageMarker> > Get_Valid_Marker(const QSt
         }
     }
     QVector<ImageMarker> ret1;
-    for(int i=0;i<5;++i){
+    for(int i=0;i<4;++i){
         ret1.push_back(q.top().marker);
         q.pop();
     }
@@ -979,7 +979,7 @@ std::pair<QVector<ImageMarker>,QVector<ImageMarker> > Get_Valid_Marker(const QSt
         }
     }
     QVector<ImageMarker> ret2;
-    for(int i=0;i<4;++i){
+    for(int i=0;i<2;++i){
         ret2.push_back(q.top().marker);
         q.pop();
     }
@@ -1165,9 +1165,9 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                     }
                 }
             }
-            if(App2_Tree.listNeuron.empty()){
-                 App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
-            }
+//            if(App2_Tree.listNeuron.empty()){
+//                 App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
+//            }
 
            QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
            QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
