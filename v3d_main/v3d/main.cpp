@@ -173,8 +173,8 @@ QVector<NeuronSWC> used_swc;
 int X=14530,Y=10693,Z=3124;
 double close_distance=4;
 double identical_threshold=300;   //(undetermined)
-double seg_identical_threshold_mean=60;
-double seg_identical_threshold_mx=120;
+//double seg_identical_threshold_mean=100;
+double seg_identical_threshold_mx=200;
 double Border_Threshold=50;
 
 double distance_square(const NeuronSWC & point_a,const NeuronSWC & point_b){
@@ -319,20 +319,13 @@ double Distance_Unit_To_Tree(const NeuronSWC & p,const V_NeuronSWC_list & Check_
     return Distance_Unit_To_Tree(u,Check_Tree);
 }
 bool Check_Seg_Identical(const V_NeuronSWC & Check_Seg,const V_NeuronSWC_list & Answer_Tree){
-    double mean=0;
-    double mxx=-1e8;
-    int num=0;
+    double mx=-1e8;
     for(const V_NeuronSWC_unit & Check_Point:Check_Seg.row){
-         double mx=-1e8;
          for(const V_NeuronSWC & Answer_Seg:Answer_Tree.seg){
             mx=std::max(mx,Distance_Unit_To_Seg(Check_Point,Answer_Seg));
-            mxx=std::max(mxx,mx);
          }
-         ++num;
-         mean+=mx;
     }
-    mean/=num;
-    return mean<seg_identical_threshold_mean && mxx<seg_identical_threshold_mx;
+    return mx<seg_identical_threshold_mx;
 }
 bool Check_Tree_Identical(const V_NeuronSWC_list & Check_Tree,const V_NeuronSWC_list & Answer_Tree){
     if(Answer_Tree.seg.empty()) return false;
