@@ -276,7 +276,7 @@ double dot_mul(const XYZ & p1,const XYZ & p2){                  //dot multiply v
 }
 XYZ projection(const XYZ & cal_point,const XYZ & p1,const XYZ & p2){
     double dm=dot_mul(p1,cal_point,p2);
-    return p1+(p2-p1)*(dm/distance_XYZ(p1,p2));
+    return p1+(p2-p1)*(dm/distance_XYZ(p1,p2))/distance_XYZ(p1,p2);
 }
 double dot_to_line(const XYZ & cal_point,const XYZ & p1,const XYZ & p2){
     XYZ proj=projection(cal_point,p1,p2);
