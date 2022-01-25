@@ -173,8 +173,8 @@ QVector<NeuronSWC> used_swc;
 int X=14530,Y=10693,Z=3124;
 double close_distance=4;
 double identical_threshold=300;   //(undetermined)
-double seg_identical_threshold_mean=50;
-double seg_identical_threshold_mx=100;
+double seg_identical_threshold_mean=60;
+double seg_identical_threshold_mx=120;
 double Border_Threshold=50;
 
 double distance_square(const NeuronSWC & point_a,const NeuronSWC & point_b){
@@ -354,6 +354,23 @@ double Distance_Point_To_Border(const NeuronSWC & point,const int & blocksize){
 double Vector_Angle(const XYZ & a,const XYZ & b){
     static const double PI=std::acos(-1);
     return std::acos(dot_mul(a,b)/distance_XYZ(XYZ(0.0),a)/distance_XYZ(XYZ(0.0),b))*(180/PI);
+}
+bool has_same_vector(const V_NeuronSWC & Seg,const QVector<XYZ> & v){
+    XYZ v1;
+    v1.x=Seg.row.front().x;
+    v1.y=Seg.row.front().y;
+    v1.z=Seg.row.front().z;
+    XYZ v2;
+    v2.x=Seg.row.back().x;
+    v2.y=Seg.row.back().y;
+    v2.z=Seg.row.back().z;
+    XYZ seg=v1-v2;
+    for(const XYZ & vec:v){
+        if(Vector_Angle(seg,vec)<30||Vector_Angle(seg,vec)>150){
+            return true;
+        }
+    }
+    return false;
 }
 void Drop_NeuronSWC(const QString &path,const QList<NeuronSWC> & output){
     QFile file(path);
@@ -1276,7 +1293,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            if(center_id>0){
                V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
                //app2 is not accurate
-               if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
+               if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)||(V_Answer_Tree.seg.size()==1?3:V_Answer_Tree.seg.size()*2)<V_App2_Tree.seg.size()){
                    use_answer=true;
                    App2_Tree=Answer_Tree;
                }
@@ -1290,9 +1307,34 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            update_Ans_used(Get_Ans_In_BBox(centerAPO,blocksize));
        }
 
+       V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(App2_Tree);
+       if(!use_answer){
+           QVector<XYZ> Ans_Vec;
+           for(const V_NeuronSWC & Seg:V_Answer_Tree.seg){
+               if(Seg.row.size()>1){
+                   XYZ v1;
+                   v1.x=Seg.row.front().x;
+                   v1.y=Seg.row.front().y;
+                   v1.z=Seg.row.front().z;
+                   XYZ v2;
+                   v2.x=Seg.row.back().x;
+                   v2.y=Seg.row.back().y;
+                   v2.z=Seg.row.back().z;
+                   Ans_Vec.push_back(v1-v2);
+               }
+           }
+         for(const V_NeuronSWC & Seg:Segments.seg){
+             if(!has_same_vector(Seg,Ans_Vec)) {
+                 use_answer=true;
+                 App2_Tree=Answer_Tree;
+                 Segments=NeuronTree__2__V_NeuronSWC_list(App2_Tree);
+                 break;
+             }
+         }
+       }
+
        //save the answer(ok)
        bool if_change=false;
-       V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(App2_Tree);
        for(const V_NeuronSWC & Seg:Segments.seg){
            V_NeuronSWC Add_Seg=Seg;
            QMap<int,bool> redundant;
