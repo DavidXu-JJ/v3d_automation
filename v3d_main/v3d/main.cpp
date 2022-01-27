@@ -196,15 +196,15 @@ bool if_finish(){
 }
 int unused_id(){
     int id=-1;
-    double mxdis=-1e8;
+    double mxmn=-1e8;
     for(const NeuronSWC & i:Ans_Tree.listNeuron){
         if(!Ans_used.count(i.n)){
-            double now_mx=-1e8;
+            double now_mn=1e8;
             for(auto it=Ans_used.begin();it!=Ans_used.end();++it){
-                now_mx=std::max(now_mx,distance_square(Answer_Map[it.key()],i));
+                now_mn=std::min(now_mn,distance_square(Answer_Map[it.key()],i));
             }
-            if(mxdis<now_mx){
-                mxdis=now_mx;
+            if(mxmn<now_mn){
+                mxmn=now_mn;
                 id=i.n;
             }
         }
