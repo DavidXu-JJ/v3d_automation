@@ -258,7 +258,11 @@ NeuronTree Get_Ans_In_BBox(const CellAPO & centerAPO,const int & blocksize){
     for(const NeuronSWC & swc:Ans_Tree.listNeuron){
         if(between(swc.x,X-blocksize/2,X+blocksize/2)&&between(swc.y,Y-blocksize/2,Y+blocksize/2)&&between(swc.z,Z-blocksize/2,Z+blocksize/2)){
             Inbox[swc.n]=true;
-            ret.listNeuron.push_back(swc);
+            NeuronSWC add=swc;
+            add.x=swc.x-X+blocksize/2;
+            add.y=swc.y-Y+blocksize/2;
+            add.z=swc.z-Z+blocksize/2;
+            ret.listNeuron.push_back(add);
         }
     }
     for(NeuronSWC & i:ret.listNeuron){
