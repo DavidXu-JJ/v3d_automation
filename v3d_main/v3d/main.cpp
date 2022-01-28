@@ -251,12 +251,19 @@ void update_Ans_used(const NeuronSWC & update){
 
 NeuronTree Get_Ans_In_BBox(const CellAPO & centerAPO,const int & blocksize){
     NeuronTree ret;
+    QMap<int,bool> Inbox;
     const int & X=centerAPO.x;
     const int & Y=centerAPO.y;
     const int & Z=centerAPO.z;
     for(const NeuronSWC & swc:Ans_Tree.listNeuron){
         if(between(swc.x,X-blocksize/2,X+blocksize/2)&&between(swc.y,Y-blocksize/2,Y+blocksize/2)&&between(swc.z,Z-blocksize/2,Z+blocksize/2)){
+            Inbox[swc.n]=true;
             ret.listNeuron.push_back(swc);
+        }
+    }
+    for(NeuronSWC & i:ret.listNeuron){
+        if(!Inbox.count(i.parent)){
+            i.parent=-1;
         }
     }
     return ret;
