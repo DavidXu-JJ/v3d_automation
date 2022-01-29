@@ -132,16 +132,16 @@ QString generate_swc_name(const std::string & path,const CellAPO &centerAPO){
     return QString::fromStdString(path+"/"+std::to_string(int(centerAPO.x))+".000_"+std::to_string(int(centerAPO.y))+".000_"+std::to_string(int(centerAPO.z))+".000.swc");
 }
 
-struct node{
-    int x,y,z,marker_x,marker_y,marker_z;
-    node(int x_,int y_,int z_,int marker_x_,int marker_y_,int marker_z_):x(x_),y(y_),z(z_),marker_x(marker_x_),marker_y(marker_y_),marker_z(marker_z_){}
-    bool operator == (const node & cmp) const{
-        return (x==cmp.x)&&(y==cmp.y)&&(z==cmp.z)&&(marker_x==cmp.marker_x)&&(marker_y==cmp.marker_y)&&(marker_z==cmp.marker_z);
-    }
-    bool operator < (const node & cmp) const{
-        return x<cmp.x;
-    }
-};
+//struct node{
+//    int x,y,z,marker_x,marker_y,marker_z;
+//    node(int x_,int y_,int z_,int marker_x_,int marker_y_,int marker_z_):x(x_),y(y_),z(z_),marker_x(marker_x_),marker_y(marker_y_),marker_z(marker_z_){}
+//    bool operator == (const node & cmp) const{
+//        return (x==cmp.x)&&(y==cmp.y)&&(z==cmp.z)&&(marker_x==cmp.marker_x)&&(marker_y==cmp.marker_y)&&(marker_z==cmp.marker_z);
+//    }
+//    bool operator < (const node & cmp) const{
+//        return x<cmp.x;
+//    }
+//};
 
 struct bbox_extend{
     int center_id;
@@ -167,14 +167,14 @@ QProcess p;
 int dx[6]={1,-1,0,0,0,0};
 int dy[6]={0,0,1,-1,0,0};
 int dz[6]={0,0,0,0,1,-1};
-QMap<node,bool> vis;
+//QMap<node,bool> vis;
 QVector<NeuronSWC> used_swc;
 
 int X=14530,Y=10693,Z=3124;
 double close_distance=4;
 double identical_threshold=300;   //(undetermined)
-//double seg_identical_threshold_mean=100;
-double seg_identical_threshold_mx=200;
+double seg_identical_threshold_mean=50;
+double seg_identical_threshold_mx=100;
 double Border_Threshold=50;
 
 double distance_square(const NeuronSWC & point_a,const NeuronSWC & point_b){
@@ -278,6 +278,10 @@ double distance_XYZ(const XYZ & p1,const XYZ & p2){
     XYZ vec=p2-p1;
     return sqrt(vec.x*vec.x+vec.y*vec.y+vec.z*vec.z);
 }
+double distance_unit(const V_NeuronSWC_unit & p1,const V_NeuronSWC_unit & p2){
+    XYZ vec=XYZ(p2.x-p1.x,p2.y-p1.y,p2.z-p1.z);
+    return sqrt(vec.x*vec.x+vec.y*vec.y+vec.z*vec.z);
+}
 double dot_mul(const XYZ & mid,const XYZ & p1,const XYZ & p2){  //dot multiply mid->p1 and mid-p2
     XYZ diff1=p1-mid,diff2=p2-mid;
     return diff1.x*diff2.x+diff1.y*diff2.y+diff1.z*diff2.z;
@@ -329,14 +333,30 @@ double Distance_Unit_To_Tree(const NeuronSWC & p,const V_NeuronSWC_list & Check_
     u.x=p.x;u.y=p.y;u.z=p.z;
     return Distance_Unit_To_Tree(u,Check_Tree);
 }
+double Tree_Length(const V_NeuronSWC_list & tree){
+    double ret=0;
+    for(const V_NeuronSWC & seg:tree.seg){
+        for(int i=0;i<seg.row.size()-1;++i){
+            ret+=distance_unit(seg.row[i],seg.row[i+1]);
+        }
+    }
+    return ret;
+}
 bool Check_Seg_Identical(const V_NeuronSWC & Check_Seg,const V_NeuronSWC_list & Answer_Tree){
-    double mx=-1e8;
+    double mean=0;
+    double mxx=-1e8;
+    int num=0;
     for(const V_NeuronSWC_unit & Check_Point:Check_Seg.row){
+         double mx=-1e8;
          for(const V_NeuronSWC & Answer_Seg:Answer_Tree.seg){
             mx=std::max(mx,Distance_Unit_To_Seg(Check_Point,Answer_Seg));
+            mxx=std::max(mxx,mx);
          }
+         ++num;
+         mean+=mx;
     }
-    return mx<seg_identical_threshold_mx;
+    mean/=num;
+    return mean<seg_identical_threshold_mean && mxx<seg_identical_threshold_mx;
 }
 bool Check_Tree_Identical(const V_NeuronSWC_list & Check_Tree,const V_NeuronSWC_list & Answer_Tree){
     if(Answer_Tree.seg.empty()) return false;
@@ -351,6 +371,10 @@ bool Check_Tree_Identical(const NeuronTree & Check_Tree,const V_NeuronSWC_list &
     NeuronTree cpy=Check_Tree;
     V_NeuronSWC_list ls=NeuronTree__2__V_NeuronSWC_list(cpy);
     return Check_Tree_Identical(ls,Answer_Tree);
+}
+bool Check_Tree_Length(const V_NeuronSWC_list & Check_Tree,const V_NeuronSWC_list & Answer_Tree){
+    double len1=Tree_Length(Check_Tree),len2=Tree_Length(Answer_Tree);
+    return std::abs(len1-len2)/std::max(len1,len2)<0.15;
 }
 double Distance_Point_To_Border(const NeuronSWC & point,const int & blocksize){
     return std::min({point.x,abs(blocksize-point.x),point.y,abs(blocksize-point.y),point.z,abs(blocksize-point.z)});
@@ -586,8 +610,8 @@ NeuronTree Get_Answer_Tree(const int & depth,const CellAPO & centerAPO,const Ima
     //这个参数我认为有点底层，不太应该给用户调整，
     //表示如果答案在这个bbox的边界点中，距离本次DFS距离最小的Marker距离如果大于threshold，就舍弃，认为这个本次的bbox中没有以Marker为起点的树
     //之前生成的图为了保证尽可能搜得广，所以在blocksize为256的时候，直接取500，实际合理的threshold没有测试过，姑且取了blocksize/4
-    const int threshold=1.171875*blocksize;
-    if(mn>threshold) return NeuronTree();
+//    const int threshold=1.171875*blocksize;
+//    if(mn>threshold) return NeuronTree();
 
     NeuronTree Return_Tree;
     NeuronSWC StartPoint_In_Answer=mp[pick_id];
@@ -870,95 +894,99 @@ std::pair<QVector<ImageMarker>,QVector<ImageMarker> > Get_Valid_Marker(const QSt
     }
     std::priority_queue<marker_with_intensity> q;
     std::map<std::tuple<int,int,int>,bool> mp;
-    if(startPoint.x==blocksize/2 && startPoint.y==blocksize/2 &&startPoint.z==blocksize/2){
-        for(int i=0;i<d.size();++i){
-            for(int j=0;j<d.size();++j){
-                for(int k=0;k<d.size();++k){
-                    if(mp.count(std::tuple<int,int,int> (d[i],d[j],d[k]))) continue;
-                    mp[std::tuple<int,int,int> (d[i],d[j],d[k])]=true;
-                    ImageMarker new_marker=startPoint;
-                    new_marker.x+=d[i];
-                    new_marker.y+=d[j];
-                    new_marker.z+=d[k];
-                    unsigned idx=Get_Marker_Idx(new_marker,blocksize);
-                    q.push(marker_with_intensity(new_marker,indata1d[idx]));
-                }
-            }
-        }
-        QVector<ImageMarker> ret1;
-        for(int i=0;i<5;++i){
-            ret1.push_back(q.top().marker);
-            q.pop();
-        }
-        return std::make_pair(ret1,QVector<ImageMarker> () );
-    }
-    if(startPoint.x!=blocksize/2){
-        for(int i=0;i<d.size();++i){
-            for(int j=0;j<=i;++j){
-                const int & d1=d[i];
-                const int & d2=d[j];
+
+    for(int i=0;i<d.size();++i){
+        for(int j=0;j<d.size();++j){
+            for(int k=0;k<d.size();++k){
+                if(mp.count(std::tuple<int,int,int> (d[i],d[j],d[k]))) continue;
+                mp[std::tuple<int,int,int> (d[i],d[j],d[k])]=true;
                 ImageMarker new_marker=startPoint;
-                new_marker.y+=d1;
-                new_marker.z+=d2;
+                new_marker.x+=d[i];
+                new_marker.y+=d[j];
+                new_marker.z+=d[k];
+                if(new_marker.x<=0||new_marker.x>=blocksize||new_marker.y<=0||new_marker.y>=blocksize||new_marker.z<=0||new_marker.z>=blocksize) continue;
                 unsigned idx=Get_Marker_Idx(new_marker,blocksize);
                 q.push(marker_with_intensity(new_marker,indata1d[idx]));
-                if(i==j) continue;
-                new_marker=startPoint;
-                new_marker.z+=d1;
-                new_marker.y+=d2;
-                idx=Get_Marker_Idx(new_marker,blocksize);
-                q.push(marker_with_intensity(new_marker,indata1d[idx]));
-
-            }
-        }
-    }else{
-        if(startPoint.y!=blocksize/2){
-            for(int i=0;i<d.size();++i){
-                for(int j=0;j<=i;++j){
-                    const int & d1=d[i];
-                    const int & d2=d[j];
-                    ImageMarker new_marker=startPoint;
-                    new_marker.x+=d1;
-                    new_marker.z+=d2;
-                    unsigned idx=Get_Marker_Idx(new_marker,blocksize);
-                    q.push(marker_with_intensity(new_marker,indata1d[idx]));
-                    if(i==j) continue;
-                    new_marker=startPoint;
-                    new_marker.z+=d1;
-                    new_marker.x+=d2;
-                    idx=Get_Marker_Idx(new_marker,blocksize);
-                    q.push(marker_with_intensity(new_marker,indata1d[idx]));
-
-                }
-            }
-        }else{
-            if(startPoint.z!=blocksize/2){
-                for(int i=0;i<d.size();++i){
-                    for(int j=0;j<=i;++j){
-                        const int & d1=d[i];
-                        const int & d2=d[j];
-                        ImageMarker new_marker=startPoint;
-                        new_marker.x+=d1;
-                        new_marker.y+=d2;
-                        unsigned idx=Get_Marker_Idx(new_marker,blocksize);
-                        q.push(marker_with_intensity(new_marker,indata1d[idx]));
-                        if(i==j) continue;
-                        new_marker=startPoint;
-                        new_marker.y+=d1;
-                        new_marker.x+=d2;
-                        idx=Get_Marker_Idx(new_marker,blocksize);
-                        q.push(marker_with_intensity(new_marker,indata1d[idx]));
-
-                    }
-                }
             }
         }
     }
     QVector<ImageMarker> ret1;
-    for(int i=0;i<4;++i){
+    for(int i=0;i<5;++i){
         ret1.push_back(q.top().marker);
         q.pop();
     }
+
+    if(startPoint.x==blocksize/2 && startPoint.y==blocksize/2 &&startPoint.z==blocksize/2){
+        return std::make_pair(ret1,QVector<ImageMarker> () );
+    }
+
+//    q=std::priority_queue<marker_with_intensity>();
+//    if(startPoint.x!=blocksize/2){
+//        for(int i=0;i<d.size();++i){
+//            for(int j=0;j<=i;++j){
+//                const int & d1=d[i];
+//                const int & d2=d[j];
+//                ImageMarker new_marker=startPoint;
+//                new_marker.y+=d1;
+//                new_marker.z+=d2;
+//                unsigned idx=Get_Marker_Idx(new_marker,blocksize);
+//                q.push(marker_with_intensity(new_marker,indata1d[idx]));
+//                if(i==j) continue;
+//                new_marker=startPoint;
+//                new_marker.z+=d1;
+//                new_marker.y+=d2;
+//                idx=Get_Marker_Idx(new_marker,blocksize);
+//                q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+//            }
+//        }
+//    }else{
+//        if(startPoint.y!=blocksize/2){
+//            for(int i=0;i<d.size();++i){
+//                for(int j=0;j<=i;++j){
+//                    const int & d1=d[i];
+//                    const int & d2=d[j];
+//                    ImageMarker new_marker=startPoint;
+//                    new_marker.x+=d1;
+//                    new_marker.z+=d2;
+//                    unsigned idx=Get_Marker_Idx(new_marker,blocksize);
+//                    q.push(marker_with_intensity(new_marker,indata1d[idx]));
+//                    if(i==j) continue;
+//                    new_marker=startPoint;
+//                    new_marker.z+=d1;
+//                    new_marker.x+=d2;
+//                    idx=Get_Marker_Idx(new_marker,blocksize);
+//                    q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+//                }
+//            }
+//        }else{
+//            if(startPoint.z!=blocksize/2){
+//                for(int i=0;i<d.size();++i){
+//                    for(int j=0;j<=i;++j){
+//                        const int & d1=d[i];
+//                        const int & d2=d[j];
+//                        ImageMarker new_marker=startPoint;
+//                        new_marker.x+=d1;
+//                        new_marker.y+=d2;
+//                        unsigned idx=Get_Marker_Idx(new_marker,blocksize);
+//                        q.push(marker_with_intensity(new_marker,indata1d[idx]));
+//                        if(i==j) continue;
+//                        new_marker=startPoint;
+//                        new_marker.y+=d1;
+//                        new_marker.x+=d2;
+//                        idx=Get_Marker_Idx(new_marker,blocksize);
+//                        q.push(marker_with_intensity(new_marker,indata1d[idx]));
+
+//                    }
+//                }
+//            }
+//        }
+//    }
+//    for(int i=0;i<5;++i){
+//        ret1.push_back(q.top().marker);
+//        q.pop();
+//    }
 
     const int low=4;
     const int high=10;
@@ -1031,12 +1059,56 @@ std::pair<QVector<ImageMarker>,QVector<ImageMarker> > Get_Valid_Marker(const QSt
         }
     }
     QVector<ImageMarker> ret2;
-    for(int i=0;i<2;++i){
+    for(int i=0;i<5;++i){
         ret2.push_back(q.top().marker);
         q.pop();
     }
     ret.first=ret1;
     ret.second=ret2;
+    return ret;
+}
+
+bool if_complicated(const CellAPO & centerAPO,const int & blocksize){
+    int st_id=-1;
+    QMap<int,bool> Inbox;
+    const int & X=centerAPO.x;
+    const int & Y=centerAPO.y;
+    const int & Z=centerAPO.z;
+    for(const NeuronSWC & swc:Ans_Tree.listNeuron){
+        if(between(swc.x,X-blocksize/2,X+blocksize/2)&&between(swc.y,Y-blocksize/2,Y+blocksize/2)&&between(swc.z,Z-blocksize/2,Z+blocksize/2)){
+            Inbox[swc.n]=true;
+            st_id=swc.n;
+        }
+    }
+    if(st_id==-1) return true;
+    QQueue<int> q;
+    q.push_back(st_id);
+    QMap<int,bool> vis;
+    while(!q.empty()){
+        int now=q.front();
+        q.pop_front();
+        vis[now]=true;
+        for(const int & to:Answer_Graph[now]){
+            if(!vis[to]){
+                q.push_back(to);
+            }
+        }
+    }
+    for(auto i=Inbox.begin();i!=Inbox.end();++i){
+        if(!vis.count(i.key())){
+            return true;
+        }
+    }
+    return false;
+}
+
+NeuronTree Get_Everything_Inbox(const CellAPO & centerAPO,const int & blocksize){
+    NeuronTree ret;
+    for(const NeuronSWC & swc:Ans_Tree.listNeuron){
+        if(between(swc.x,X-blocksize/2,X+blocksize/2)&&between(swc.y,Y-blocksize/2,Y+blocksize/2)&&between(swc.z,Z-blocksize/2,Z+blocksize/2)){
+            ret.listNeuron.push_back(swc);
+        }
+    }
     return ret;
 }
 
@@ -1079,7 +1151,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
         }
         if(bbox_queue.empty()){
             used_swc.clear();
-            vis.clear();
+//            vis.clear();
             has_extend.clear();
             amount=0;
             int id=unused_id();
@@ -1108,104 +1180,111 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
 
         qDebug()<<"start DFS,center_id="<<center_id;
 
-        node now_node=node(centerAPO.x,centerAPO.y,centerAPO.z,startPoint.x,startPoint.y,startPoint.z);
-
-        //drop apo file(ok)
-        QList<CellAPO> List_APO_Write;
-        List_APO_Write.push_back(centerAPO);
-        QString APO_File_Name=generate_apo_name(Work_Dir.toStdString()+"/APOFile",centerAPO);	//make file in ./APOFile/xxx.000_xxx.000_xxx.000.apo
-        writeAPO_file(APO_File_Name,List_APO_Write);
-
-
-        QString rawFileName=QString("%1.000_%2.000_%3.000.v3draw").arg(centerAPO.x).arg(centerAPO.y).arg(centerAPO.z);
-
-        //crop3D(ok)
-        qDebug()<<"crop3D:"
-           <<p.execute(Vaa3d_App_Path+QString("/vaa3d_msvc.exe"),QStringList()
-               <<"/x"<<Vaa3d_App_Path+QString("/plugins/image_geometry/crop3d_image_series/cropped3DImageSeries.dll")
-               <<"/f"<<"cropTerafly"<<"/i"<<Res_Path<<APO_File_Name<<Work_Dir+QString("/testV3draw/")
-               <<"/p"<<QString::number(blocksize)<<QString::number(blocksize)<<QString::number(blocksize));
-
-        QFile crop_file(Work_Dir+QString("/testV3draw/")+rawFileName);
-        if(v3draw_size==-1){
-            v3draw_size=crop_file.size();
-        }
-        else {
-            if(crop_file.size()!=v3draw_size){
-                NeuronTree Ans_In_BBox=Get_Ans_In_BBox(centerAPO,blocksize);
-                V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(Ans_In_BBox);
-                for(const V_NeuronSWC & Seg:Segments.seg){
-                    V_NeuronSWC Add_Seg=Seg;
-                    QMap<int,bool> redundant;
-                    for(int i=0; i<Add_Seg.row.size();++i){
-                        //(ok)
-                        V_NeuronSWC_unit & swc=Add_Seg.row[i];
-                        swc.x+=centerAPO.x-blocksize/2;
-                        swc.y+=centerAPO.y-blocksize/2;
-                        swc.z+=centerAPO.z-blocksize/2;
-                        if(App2_Generate.seg.empty()) continue;
-                        if(Distance_Unit_To_Tree(swc,App2_Generate)<close_distance){
-                            redundant[i]=true;
-                        }
-                    }
-
-                    for(int i=0;i<Add_Seg.row.size();++i){
-                        if(!redundant.count(i)){
-                            V_NeuronSWC Not_Redundant;
-                            int now=i;
-                            int amount=0;
-                            while(now<Add_Seg.row.size() && !redundant.count(now)){
-                                V_NeuronSWC_unit unit=Add_Seg.row[now];
-                                ++amount;
-                                unit.type=3;
-                                unit.n=amount;
-                                unit.parent=amount+1;
-                                Not_Redundant.row.push_back(unit);
-                                ++now;
-                            }
-                            Not_Redundant.row.back().parent=-1;
-                            i=now;
-                            if(Not_Redundant.row.size()<=2) continue;
-                            App2_Generate.append(Not_Redundant);
-
-                        }
-                    }
-                }
-                update_Ans_used(Ans_In_BBox);
-                QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
-                continue;
-            }
-        }
-
-        //ada(ok)
-        qDebug()<<"ada:"
-           <<p.execute(Vaa3d_App_Path+QString("/vaa3d_msvc.exe"),QStringList()
-               <<"/x"<<Vaa3d_App_Path+QString("/plugins/image_thresholding/Simple_Adaptive_Thresholding/ada_threshold.dll")
-               <<"/f"<<"adath"<<"/i"<<Work_Dir+QString("/testV3draw/")+rawFileName<<"/o"<<QString(Work_Dir+QString("/testV3draw/thres_")+rawFileName));
-
-        ImageMarker startPointBackup=startPoint;
-        NeuronTree Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize,centerSWC);
-        if(Answer_Tree.listNeuron.empty()) continue;
-        V_NeuronSWC_list V_Answer_Tree = NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
+//        node now_node=node(centerAPO.x,centerAPO.y,centerAPO.z,startPoint.x,startPoint.y,startPoint.z);
 
         NeuronTree App2_Tree=NeuronTree();
-        if(center_id!=0){
-            QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
-            std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(v3draw,startPoint,blocksize);
-            for(const ImageMarker & i:possible.first){
-                startPoint=i;
-                App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
-                if(!App2_Tree.listNeuron.empty()){
-                    V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
-                    if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
-                        App2_Tree=NeuronTree();
-                        continue;
+        bool use_answer=false;
+        NeuronTree Answer_Tree=NeuronTree();
+        V_NeuronSWC_list V_Answer_Tree;
+
+
+        ImageMarker Absolute_Marker=startPoint;
+        Absolute_Marker.x+=centerAPO.x-blocksize/2;
+        Absolute_Marker.y+=centerAPO.y-blocksize/2;
+        Absolute_Marker.z+=centerAPO.z-blocksize/2;
+
+        //if the square of distance between used_swc and new_border_point is lower than identical_threshold, don't search it
+        QVector<NeuronSWC> Border_Points=Find_Extend_Marker(centerAPO,Absolute_Marker,blocksize);
+
+        if(Border_Points.size()>=3){
+            use_answer=true;
+            Answer_Tree=Get_Ans_In_BBox(centerAPO,blocksize);
+            V_Answer_Tree=NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
+        }
+        else{
+            //drop apo file(ok)
+            QList<CellAPO> List_APO_Write;
+            List_APO_Write.push_back(centerAPO);
+            QString APO_File_Name=generate_apo_name(Work_Dir.toStdString()+"/APOFile",centerAPO);	//make file in ./APOFile/xxx.000_xxx.000_xxx.000.apo
+            writeAPO_file(APO_File_Name,List_APO_Write);
+
+
+            QString rawFileName=QString("%1.000_%2.000_%3.000.v3draw").arg(centerAPO.x).arg(centerAPO.y).arg(centerAPO.z);
+
+            //crop3D(ok)
+            qDebug()<<"crop3D:"
+               <<p.execute(Vaa3d_App_Path+QString("/vaa3d_msvc.exe"),QStringList()
+                   <<"/x"<<Vaa3d_App_Path+QString("/plugins/image_geometry/crop3d_image_series/cropped3DImageSeries.dll")
+                   <<"/f"<<"cropTerafly"<<"/i"<<Res_Path<<APO_File_Name<<Work_Dir+QString("/testV3draw/")
+                   <<"/p"<<QString::number(blocksize)<<QString::number(blocksize)<<QString::number(blocksize));
+
+            QFile crop_file(Work_Dir+QString("/testV3draw/")+rawFileName);
+            if(v3draw_size==-1){
+                v3draw_size=crop_file.size();
+            }
+            else {
+                if(crop_file.size()!=v3draw_size){
+                    NeuronTree Ans_In_BBox=Get_Ans_In_BBox(centerAPO,blocksize);
+                    V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(Ans_In_BBox);
+                    for(const V_NeuronSWC & Seg:Segments.seg){
+                        V_NeuronSWC Add_Seg=Seg;
+                        QMap<int,bool> redundant;
+                        for(int i=0; i<Add_Seg.row.size();++i){
+                            //(ok)
+                            V_NeuronSWC_unit & swc=Add_Seg.row[i];
+                            swc.x+=centerAPO.x-blocksize/2;
+                            swc.y+=centerAPO.y-blocksize/2;
+                            swc.z+=centerAPO.z-blocksize/2;
+                            if(App2_Generate.seg.empty()) continue;
+                            if(Distance_Unit_To_Tree(swc,App2_Generate)<close_distance){
+                                redundant[i]=true;
+                            }
+                        }
+
+                        for(int i=0;i<Add_Seg.row.size();++i){
+                            if(!redundant.count(i)){
+                                V_NeuronSWC Not_Redundant;
+                                int now=i;
+                                int amount=0;
+                                while(now<Add_Seg.row.size() && !redundant.count(now)){
+                                    V_NeuronSWC_unit unit=Add_Seg.row[now];
+                                    ++amount;
+                                    unit.type=3;
+                                    unit.n=amount;
+                                    unit.parent=amount+1;
+                                    Not_Redundant.row.push_back(unit);
+                                    ++now;
+                                }
+                                Not_Redundant.row.back().parent=-1;
+                                i=now;
+                                if(Not_Redundant.row.size()<=2) continue;
+                                App2_Generate.append(Not_Redundant);
+
+                            }
+                        }
                     }
-                    break;
+                    update_Ans_used(Ans_In_BBox);
+                    QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
+                    continue;
                 }
             }
-            if(App2_Tree.listNeuron.empty()){
-                for(const ImageMarker & i:possible.second){
+
+            //ada(ok)
+            qDebug()<<"ada:"
+               <<p.execute(Vaa3d_App_Path+QString("/vaa3d_msvc.exe"),QStringList()
+                   <<"/x"<<Vaa3d_App_Path+QString("/plugins/image_thresholding/Simple_Adaptive_Thresholding/ada_threshold.dll")
+                   <<"/f"<<"adath"<<"/i"<<Work_Dir+QString("/testV3draw/")+rawFileName<<"/o"<<QString(Work_Dir+QString("/testV3draw/thres_")+rawFileName));
+
+            ImageMarker startPointBackup=startPoint;
+//            Answer_Tree = Get_Answer_Tree(center_id,centerAPO,startPoint,blocksize,centerSWC);
+            Answer_Tree = Get_Ans_In_BBox(centerAPO,blocksize);
+            if(Answer_Tree.listNeuron.empty()) continue;
+            V_Answer_Tree = NeuronTree__2__V_NeuronSWC_list(Answer_Tree);
+
+            if(center_id!=0){
+                QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
+                std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(v3draw,startPoint,blocksize);
+                for(const ImageMarker & i:possible.first){
                     startPoint=i;
                     App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
                     if(!App2_Tree.listNeuron.empty()){
@@ -1217,49 +1296,55 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
                         break;
                     }
                 }
-            }
-//            if(App2_Tree.listNeuron.empty()){
-//                 App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
-//            }
-
-           QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
-           QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
-        }
-        else {
-            QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
-            std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(v3draw,startPoint,blocksize);
-            for(const ImageMarker & i:possible.first){
-                startPoint=i;
-                App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
-                if(!App2_Tree.listNeuron.empty()){
-                    V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
-                    if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
-                        App2_Tree=NeuronTree();
-                        continue;
+                if(App2_Tree.listNeuron.empty()){
+                    for(const ImageMarker & i:possible.second){
+                        startPoint=i;
+                        App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+                        if(!App2_Tree.listNeuron.empty()){
+                            V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
+                            if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
+                                App2_Tree=NeuronTree();
+                                continue;
+                            }
+                            break;
+                        }
                     }
-                    break;
                 }
+    //            if(App2_Tree.listNeuron.empty()){
+    //                 App2_Tree=Find_Valid_App2_Tree(centerAPO,startPoint,blocksize,v3draw);
+    //            }
+
+               QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
+               QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
             }
-            if(App2_Tree.listNeuron.empty()){
-                startPoint=startPointBackup;
-                App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+            else {
+                QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
+                std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(v3draw,startPoint,blocksize);
+                for(const ImageMarker & i:possible.first){
+                    startPoint=i;
+                    App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+                    if(!App2_Tree.listNeuron.empty()){
+                        V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
+                        if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)){
+                            App2_Tree=NeuronTree();
+                            continue;
+                        }
+                        break;
+                    }
+                }
+                if(App2_Tree.listNeuron.empty()){
+                    startPoint=startPointBackup;
+                    App2_Tree=Vanilla_App2(centerAPO,startPoint,blocksize,rawFileName);
+                }
+
+                QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
+                QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
             }
 
-            QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
-            QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
+            if(App2_Tree.listNeuron.empty())    startPoint=startPointBackup;
+
         }
 
-        if(App2_Tree.listNeuron.empty())    startPoint=startPointBackup;
-
-        ImageMarker Absolute_Marker=startPoint;
-        Absolute_Marker.x+=centerAPO.x-blocksize/2;
-        Absolute_Marker.y+=centerAPO.y-blocksize/2;
-        Absolute_Marker.z+=centerAPO.z-blocksize/2;
-
-
-       //readfile(ok)
-       update_Ans_used(Answer_Tree);
-       bool use_answer=false;
        if(App2_Tree.listNeuron.empty()){
            use_answer=true;
        }
@@ -1297,7 +1382,7 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
            if(center_id>0){
                V_NeuronSWC_list V_App2_Tree = NeuronTree__2__V_NeuronSWC_list(App2_Tree);
                //app2 is not accurate
-               if(!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)||(V_Answer_Tree.seg.size()==1?3:V_Answer_Tree.seg.size()*2)<V_App2_Tree.seg.size()){
+               if((V_Answer_Tree.seg.size()==1?3:V_Answer_Tree.seg.size()*2)<V_App2_Tree.seg.size()||!Check_Tree_Identical(V_App2_Tree,V_Answer_Tree)||!Check_Tree_Identical(V_Answer_Tree,V_App2_Tree)){
                    use_answer=true;
                    App2_Tree=Answer_Tree;
                }
@@ -1305,10 +1390,6 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        }
        else{
            App2_Tree=Answer_Tree;
-       }
-
-       if(use_answer && center_id==0){
-           update_Ans_used(Get_Ans_In_BBox(centerAPO,blocksize));
        }
 
        V_NeuronSWC_list Segments=NeuronTree__2__V_NeuronSWC_list(App2_Tree);
@@ -1382,11 +1463,10 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        if(!if_change)  ++not_change;
        else not_change=0;
 
+
        NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
        writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
 
-       //if the square of distance between used_swc and new_border_point is lower than identical_threshold, don't search it
-       QVector<NeuronSWC> Border_Points=Find_Extend_Marker(centerAPO,Absolute_Marker,blocksize);
 
        //check if border is identical to last marker
        NeuronSWC Start_Marker_Location;
@@ -1396,10 +1476,15 @@ void App2_non_recursive_DFS(const int & Start_x,const int & Start_y,const int & 
        Start_Marker_Location.z=Absolute_Marker.z;
        used_swc.push_back(Start_Marker_Location);
 
-       if(Border_Points.empty()) continue;
-       if(vis.count(now_node)) continue;
+//       if(Border_Points.empty()) continue;
+//       if(vis.count(now_node)) continue;
 
-       vis[now_node]=true;
+       update_Ans_used(Answer_Tree);
+//       if(use_answer && center_id==0){
+//           update_Ans_used(Get_Ans_In_BBox(centerAPO,blocksize));
+//       }
+
+//       vis[now_node]=true;
 
 
        for(const NeuronSWC & Border_Point:Border_Points){//absolute
