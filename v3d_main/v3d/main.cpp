@@ -112,6 +112,7 @@ QMap<int,QVector<int> > Answer_Graph;
 QMap<int,NeuronSWC> Answer_Map;
 NeuronTree Ans_Tree;
 QMap<int,bool> Ans_used;
+QVector<NeuronSWC> Center_Set;
 
 int cnt=0;
 
@@ -126,8 +127,8 @@ QVector<NeuronSWC> used_swc;
 int X=14530,Y=10693,Z=3124;
 double close_distance=4;
 double identical_threshold=300;   //(undetermined)
-double seg_identical_threshold_mean=50;
-double seg_identical_threshold_mx=100;
+double seg_identical_threshold_mean=30;
+double seg_identical_threshold_mx=50;
 double Border_Threshold=50;
 
 double distance_square(const NeuronSWC & point_a,const NeuronSWC & point_b){
@@ -153,8 +154,8 @@ int unused_id(){
     for(const NeuronSWC & i:Ans_Tree.listNeuron){
         if(!Ans_used.count(i.n)){
             double now_mn=1e8;
-            for(auto it=Ans_used.begin();it!=Ans_used.end();++it){
-                now_mn=std::min(now_mn,distance_square(Answer_Map[it.key()],i));
+            for(const NeuronSWC & swc:Center_Set){
+                now_mn=std::min(now_mn,distance_square(swc,i));
             }
             if(mxmn<now_mn){
                 mxmn=now_mn;
@@ -326,7 +327,7 @@ bool Check_Tree_Identical(const NeuronTree & Check_Tree,const V_NeuronSWC_list &
 }
 bool Check_Tree_Length(const V_NeuronSWC_list & Check_Tree,const V_NeuronSWC_list & Answer_Tree){
     double len1=Tree_Length(Check_Tree),len2=Tree_Length(Answer_Tree);
-    return std::abs(len1-len2)/std::max(len1,len2)<0.1;
+    return std::abs(len1-len2)/std::max(len1,len2)<0.25;
 }
 double Distance_Point_To_Border(const NeuronSWC & point,const int & blocksize){
     return std::min({point.x,abs(blocksize-point.x),point.y,abs(blocksize-point.y),point.z,abs(blocksize-point.z)});
@@ -1221,6 +1222,9 @@ void App2_non_recursive_DFS(const int & blocksize,const QString & File_Name){
         int origin_id=now.origin_id;
         bool pre_use_answer=now.pre_use_answer;
         NeuronTree pretree=now.pretree;
+        if(center_id==0){
+            Center_Set.push_back(Answer_Map[origin_id]);
+        }
         if(has_extend.count(center_id)) continue;
         if(if_finish()) {
             bbox_queue.clear();
