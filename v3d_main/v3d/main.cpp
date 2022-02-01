@@ -100,9 +100,78 @@ struct bbox_extend{
     int origin_id;
     bool pre_use_answer;
     NeuronTree pretree;
-    bbox_extend(int _id_,CellAPO _centerAPO_,ImageMarker _startPoint_,int _origin_,bool _pre_use_answer,NeuronTree _pretree_):
+    bbox_extend(const int & _id_,const CellAPO & _centerAPO_,const ImageMarker & _startPoint_,const int  & _origin_,const bool & _pre_use_answer,const NeuronTree & _pretree_):
         center_id(_id_),centerAPO(_centerAPO_),startPoint(_startPoint_),origin_id(_origin_),pre_use_answer(_pre_use_answer),pretree(_pretree_){}
 };
+
+const double eps=1e-7;
+
+bool double_eq(const double & a,const double & b){
+    return std::abs(a-b)<eps;
+}
+
+bool XYZ_eq(const XYZ & p1,const XYZ & p2){
+    return double_eq(p1.x,p2.x) && double_eq(p1.y,p2.y) && double_eq(p1.z,p2.z);
+}
+
+struct XYZ_Pair{
+    XYZ p1;
+    XYZ p2;
+    XYZ_Pair(const XYZ & _p1,const XYZ & _p2):p1(_p1),p2(_p2){}
+    bool operator == (const XYZ_Pair & cmp) const {
+        return (XYZ_eq(p1,cmp.p1) && XYZ_eq(p2,cmp.p2))||(XYZ_eq(p1,cmp.p2) && XYZ_eq(p2,cmp.p1));
+    }
+    bool operator < (const XYZ_Pair & cmp) const {
+        return p1.x<cmp.p1.x;
+    }
+};
+
+void Delete_Redundant_Seg(V_NeuronSWC_list & segments){
+    V_NeuronSWC_list lines;
+
+    for(auto it=segments.seg.begin();it!=segments.seg.end();++it)
+    {
+        V_NeuronSWC & segment=*it;
+        for(int i=1;i<segment.row.size();++i)
+        {
+            V_NeuronSWC newSeg;
+            newSeg.append(segment.row.at(i-1));
+            newSeg.append(segment.row.at(i));
+            newSeg.row[0].n=1;newSeg.row[0].parent=2;
+            newSeg.row[1].n=2;newSeg.row[1].parent=-1;
+            lines.append(newSeg);
+        }
+    }
+
+    QVector<XYZ_Pair> vc;
+    for(auto it=lines.seg.begin();it!=lines.seg.end();){
+        const V_NeuronSWC_unit & u1=(*it).row[0];
+        const V_NeuronSWC_unit & u2=(*it).row[1];
+        XYZ p1,p2;
+        p1.x=u1.x;
+        p1.y=u1.y;
+        p1.z=u1.z;
+        p2.x=u2.x;
+        p2.y=u2.y;
+        p2.z=u2.z;
+        XYZ_Pair pr=XYZ_Pair(p1,p2);
+        bool if_del=false;
+        for(const XYZ_Pair & cmp:vc){
+            if(cmp==pr){
+                if_del=true;
+                break;
+            }
+        }
+        if(if_del){
+            it=lines.seg.erase(it);
+        }else{
+            vc.push_back(pr);
+            ++it;
+        }
+    }
+
+    segments=lines;
+}
 
 QString Res_Path="Z:/TeraconvertedBrain/mouse18867_teraconvert/RES(25376x40600x11203)";
 QString Vaa3d_App_Path="C:/Users/SEU/Desktop/3.603c";
@@ -130,6 +199,7 @@ double identical_threshold=300;   //(undetermined)
 double seg_identical_threshold_mean=30;
 double seg_identical_threshold_mx=50;
 double Border_Threshold=50;
+double length_indentical_rate=0.25;
 
 double distance_square(const NeuronSWC & point_a,const NeuronSWC & point_b){
     return (point_a.x-point_b.x)*(point_a.x-point_b.x)+(point_a.y-point_b.y)*(point_a.y-point_b.y)+(point_a.z-point_b.z)*(point_a.z-point_b.z);
@@ -327,7 +397,7 @@ bool Check_Tree_Identical(const NeuronTree & Check_Tree,const V_NeuronSWC_list &
 }
 bool Check_Tree_Length(const V_NeuronSWC_list & Check_Tree,const V_NeuronSWC_list & Answer_Tree){
     double len1=Tree_Length(Check_Tree),len2=Tree_Length(Answer_Tree);
-    return std::abs(len1-len2)/std::max(len1,len2)<0.25;
+    return std::abs(len1-len2)/std::max(len1,len2)<length_indentical_rate;
 }
 double Distance_Point_To_Border(const NeuronSWC & point,const int & blocksize){
     return std::min({point.x,abs(blocksize-point.x),point.y,abs(blocksize-point.y),point.z,abs(blocksize-point.z)});
@@ -1515,6 +1585,8 @@ void App2_non_recursive_DFS(const int & blocksize,const QString & File_Name){
        }
     }
 
+    Delete_Redundant_Seg(App2_Generate);
+
     NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
     writeSWC_file(Work_Dir+QString("/")+File_Name,output);
 }
@@ -1538,9 +1610,19 @@ int main(int argc, char **argv)
         if(i==4){
             Answer_File=QString::fromStdString((string(argv[i])));
         }
+        if(i==5){
+            seg_identical_threshold_mean=std::atof(argv[i]);
+        }
+        if(i==6){
+            seg_identical_threshold_mx=std::atof(argv[i]);
+        }
+        if(i==7){
+            length_indentical_rate=std::atof(argv[i]);
+        }
     }
 
     App2_non_recursive_DFS(blocksize,Output_File_Name);
+
 
     qDebug()<<"finish";
 
