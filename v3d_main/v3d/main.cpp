@@ -143,10 +143,12 @@ void Delete_Redundant_Seg(V_NeuronSWC_list & segments){
         }
     }
 
-    QVector<XYZ_Pair> vc;
-    for(auto it=lines.seg.begin();it!=lines.seg.end();){
-        const V_NeuronSWC_unit & u1=(*it).row[0];
-        const V_NeuronSWC_unit & u2=(*it).row[1];
+    static QVector<XYZ_Pair> vc;
+    static int low=0;
+    std::vector<int> del;
+    for(int i=low;i<lines.seg.size();++i){
+        const V_NeuronSWC_unit & u1=lines.seg[i].row[0];
+        const V_NeuronSWC_unit & u2=lines.seg[i].row[1];
         XYZ p1,p2;
         p1.x=u1.x;
         p1.y=u1.y;
@@ -163,12 +165,15 @@ void Delete_Redundant_Seg(V_NeuronSWC_list & segments){
             }
         }
         if(if_del){
-            it=lines.seg.erase(it);
+            del.push_back(i);
         }else{
             vc.push_back(pr);
-            ++it;
         }
     }
+    for(int i=del.size()-1;i>=0;--i){
+        lines.seg.erase(lines.seg.begin()+del[i]);
+    }
+    low=lines.seg.size();
 
     segments=lines;
 }
@@ -1520,6 +1525,7 @@ void App2_non_recursive_DFS(const int & blocksize,const QString & File_Name){
        else not_change=0;
 
 
+       Delete_Redundant_Seg(App2_Generate);
        NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
        writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
 
@@ -1622,7 +1628,6 @@ int main(int argc, char **argv)
     }
 
     App2_non_recursive_DFS(blocksize,Output_File_Name);
-
 
     qDebug()<<"finish";
 
