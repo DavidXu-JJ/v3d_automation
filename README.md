@@ -1,8 +1,84 @@
 
+# Reconstruction of neuron tree based on the app2
 
 ## Geometry
 
 ```c++
+
+const double eps=1e-7;
+
+bool double_eq(const double & a,const double & b){
+    return std::abs(a-b)<eps;
+}
+
+bool XYZ_eq(const XYZ & p1,const XYZ & p2){
+    return double_eq(p1.x,p2.x) && double_eq(p1.y,p2.y) && double_eq(p1.z,p2.z);
+}
+
+struct XYZ_Pair{
+    XYZ p1;
+    XYZ p2;
+    XYZ_Pair(const XYZ & _p1,const XYZ & _p2):p1(_p1),p2(_p2){}
+    bool operator == (const XYZ_Pair & cmp) const {
+        return (XYZ_eq(p1,cmp.p1) && XYZ_eq(p2,cmp.p2))||(XYZ_eq(p1,cmp.p2) && XYZ_eq(p2,cmp.p1));
+    }
+    bool operator < (const XYZ_Pair & cmp) const {
+        return p1.x<cmp.p1.x;
+    }
+};
+
+void Delete_Redundant_Seg(V_NeuronSWC_list & segments){
+    V_NeuronSWC_list lines;
+
+    for(auto it=segments.seg.begin();it!=segments.seg.end();++it)
+    {
+        V_NeuronSWC & segment=*it;
+        for(int i=1;i<segment.row.size();++i)
+        {
+            V_NeuronSWC newSeg;
+            newSeg.append(segment.row.at(i-1));
+            newSeg.append(segment.row.at(i));
+            newSeg.row[0].n=1;newSeg.row[0].parent=2;
+            newSeg.row[1].n=2;newSeg.row[1].parent=-1;
+            lines.append(newSeg);
+        }
+    }
+
+    static QVector<XYZ_Pair> vc;
+    static int low=0;
+    std::vector<int> del;
+    for(int i=low;i<lines.seg.size();++i){
+        const V_NeuronSWC_unit & u1=lines.seg[i].row[0];
+        const V_NeuronSWC_unit & u2=lines.seg[i].row[1];
+        XYZ p1,p2;
+        p1.x=u1.x;
+        p1.y=u1.y;
+        p1.z=u1.z;
+        p2.x=u2.x;
+        p2.y=u2.y;
+        p2.z=u2.z;
+        XYZ_Pair pr=XYZ_Pair(p1,p2);
+        bool if_del=false;
+        for(const XYZ_Pair & cmp:vc){
+            if(cmp==pr){
+                if_del=true;
+                break;
+            }
+        }
+        if(if_del){
+            del.push_back(i);
+        }else{
+            vc.push_back(pr);
+        }
+    }
+    for(int i=del.size()-1;i>=0;--i){
+        lines.seg.erase(lines.seg.begin()+del[i]);
+    }
+    low=lines.seg.size();
+
+    segments=lines;
+}
+
 double distance_square(const NeuronSWC & point_a,const NeuronSWC & point_b){
     return (point_a.x-point_b.x)*(point_a.x-point_b.x)+(point_a.y-point_b.y)*(point_a.y-point_b.y)+(point_a.z-point_b.z)*(point_a.z-point_b.z);
 }
@@ -11,8 +87,16 @@ bool between(const int & mid,const int & left,const int & right){   //double?
     return mid>=left&&mid<=right;
 }
 
+bool In_Box(const CellAPO & centerAPO,const int & blocksize,const NeuronSWC & point){
+    return between(point.x,centerAPO.x-blocksize/2,centerAPO.x+blocksize/2)&&between(point.y,centerAPO.y-blocksize/2,centerAPO.y+blocksize/2)&&between(point.z,centerAPO.z-blocksize/2,centerAPO.z+blocksize/2);
+}
+
 double distance_XYZ(const XYZ & p1,const XYZ & p2){
     XYZ vec=p2-p1;
+    return sqrt(vec.x*vec.x+vec.y*vec.y+vec.z*vec.z);
+}
+double distance_unit(const V_NeuronSWC_unit & p1,const V_NeuronSWC_unit & p2){
+    XYZ vec=XYZ(p2.x-p1.x,p2.y-p1.y,p2.z-p1.z);
     return sqrt(vec.x*vec.x+vec.y*vec.y+vec.z*vec.z);
 }
 double dot_mul(const XYZ & mid,const XYZ & p1,const XYZ & p2){  //dot multiply mid->p1 and mid-p2
@@ -24,7 +108,7 @@ double dot_mul(const XYZ & p1,const XYZ & p2){                  //dot multiply v
 }
 XYZ projection(const XYZ & cal_point,const XYZ & p1,const XYZ & p2){
     double dm=dot_mul(p1,cal_point,p2);
-    return p1+(p2-p1)*(dm/distance_XYZ(p1,p2));
+    return p1+(p2-p1)*(dm/distance_XYZ(p1,p2))/distance_XYZ(p1,p2);
 }
 double dot_to_line(const XYZ & cal_point,const XYZ & p1,const XYZ & p2){
     XYZ proj=projection(cal_point,p1,p2);
@@ -53,6 +137,7 @@ double Distance_Unit_To_Seg(const V_NeuronSWC_unit & p, const V_NeuronSWC & s){ 
     return mn;
 }
 double Distance_Unit_To_Tree(const V_NeuronSWC_unit & p,const V_NeuronSWC_list & Check_Tree){
+    if(Check_Tree.seg.empty()) return 1e-8;
     double mn=1e8;
     for(const V_NeuronSWC & Seg:Check_Tree.seg){
         mn=std::min(mn,Distance_Unit_To_Seg(p,Seg));
@@ -64,18 +149,33 @@ double Distance_Unit_To_Tree(const NeuronSWC & p,const V_NeuronSWC_list & Check_
     u.x=p.x;u.y=p.y;u.z=p.z;
     return Distance_Unit_To_Tree(u,Check_Tree);
 }
-bool Check_Seg_Identical(const V_NeuronSWC & Check_Seg,const V_NeuronSWC_list & Answer_Tree){
-    const double threshold=10;
-    double mx=-1e8;
-    for(const V_NeuronSWC_unit & Check_Point:Check_Seg.row){
-         for(const V_NeuronSWC & Answer_Seg:Answer_Tree.seg){
-            mx=std::max(mx,Distance_Unit_To_Seg(Check_Point,Answer_Seg));
+double Tree_Length(const V_NeuronSWC_list & tree){
+    double ret=0;
+    for(const V_NeuronSWC & seg:tree.seg){
+        for(int i=0;i<seg.row.size()-1;++i){
+            ret+=distance_unit(seg.row[i],seg.row[i+1]);
         }
     }
-    return mx<threshold;
+    return ret;
 }
-
+bool Check_Seg_Identical(const V_NeuronSWC & Check_Seg,const V_NeuronSWC_list & Answer_Tree){
+    double mean=0;
+    double mxx=-1e8;
+    int num=0;
+    for(const V_NeuronSWC_unit & Check_Point:Check_Seg.row){
+         double mx=-1e8;
+         for(const V_NeuronSWC & Answer_Seg:Answer_Tree.seg){
+            mx=std::max(mx,Distance_Unit_To_Seg(Check_Point,Answer_Seg));
+            mxx=std::max(mxx,mx);
+         }
+         ++num;
+         mean+=mx;
+    }
+    mean/=num;
+    return mean<seg_identical_threshold_mean && mxx<seg_identical_threshold_mx;
+}
 bool Check_Tree_Identical(const V_NeuronSWC_list & Check_Tree,const V_NeuronSWC_list & Answer_Tree){
+    if(Answer_Tree.seg.empty()) return false;
     bool flag=true;
     for(const V_NeuronSWC & Check_Seg:Check_Tree.seg){
         flag&=Check_Seg_Identical(Check_Seg,Answer_Tree);
@@ -83,20 +183,38 @@ bool Check_Tree_Identical(const V_NeuronSWC_list & Check_Tree,const V_NeuronSWC_
     }
     return flag;
 }
-
 bool Check_Tree_Identical(const NeuronTree & Check_Tree,const V_NeuronSWC_list & Answer_Tree){
     NeuronTree cpy=Check_Tree;
     V_NeuronSWC_list ls=NeuronTree__2__V_NeuronSWC_list(cpy);
     return Check_Tree_Identical(ls,Answer_Tree);
 }
-
+bool Check_Tree_Length(const V_NeuronSWC_list & Check_Tree,const V_NeuronSWC_list & Answer_Tree){
+    double len1=Tree_Length(Check_Tree),len2=Tree_Length(Answer_Tree);
+    return std::abs(len1-len2)/std::max(len1,len2)<length_indentical_rate;
+}
 double Distance_Point_To_Border(const NeuronSWC & point,const int & blocksize){
     return std::min({point.x,abs(blocksize-point.x),point.y,abs(blocksize-point.y),point.z,abs(blocksize-point.z)});
 }
-
 double Vector_Angle(const XYZ & a,const XYZ & b){
     static const double PI=std::acos(-1);
     return std::acos(dot_mul(a,b)/distance_XYZ(XYZ(0.0),a)/distance_XYZ(XYZ(0.0),b))*(180/PI);
+}
+bool has_same_vector(const V_NeuronSWC & Seg,const QVector<XYZ> & v){
+    XYZ v1;
+    v1.x=Seg.row.front().x;
+    v1.y=Seg.row.front().y;
+    v1.z=Seg.row.front().z;
+    XYZ v2;
+    v2.x=Seg.row.back().x;
+    v2.y=Seg.row.back().y;
+    v2.z=Seg.row.back().z;
+    XYZ seg=v1-v2;
+    for(const XYZ & vec:v){
+        if(Vector_Angle(seg,vec)<30||Vector_Angle(seg,vec)>150){
+            return true;
+        }
+    }
+    return false;
 }
 
 ```
@@ -133,86 +251,6 @@ void crop_ans_swc(const QString& input_file,const int &X,const int &Y,const int 
         out<<swc.n<<" "<<swc.type<<" "<<swc.x-X+blocksize/2<<" "<<swc.y-Y+blocksize/2<<" "<<swc.z-Z+blocksize/2<<" "<<swc.r<<" "<<swc.pn<<"\n";
     }
     file.close();
-}
-
-
-NeuronTree Get_Answer_Tree(const CellAPO & centerAPO,const ImageMarker & startPoint,const int & blocksize,const QString & Answer_File){
-    NeuronTree Ans_Tree=readSWC_file(Answer_File);
-
-    QMap<int,NeuronSWC> mp;
-    QMap<int,QVector<int> > G;
-    for(const NeuronSWC & i:Ans_Tree.listNeuron){
-        mp[i.n]=i;
-        G[i.n].push_back(i.pn);
-        G[i.pn].push_back(i.n);
-    }
-    const int & X=centerAPO.x;
-    const int & Y=centerAPO.y;
-    const int & Z=centerAPO.z;
-
-    QList<NeuronSWC> In_Block_Points;
-    QMap<int,int> weight;
-    for(NeuronSWC & swc:Ans_Tree.listNeuron){
-        if(between(swc.x,X-blocksize/2,X+blocksize/2)&&between(swc.y,Y-blocksize/2,Y+blocksize/2)&&between(swc.z,Z-blocksize/2,Z+blocksize/2)){
-            swc.x=swc.x-X+blocksize/2;
-            swc.y=swc.y-Y+blocksize/2;
-            swc.z=swc.z-Z+blocksize/2;
-            In_Block_Points.push_back(swc);
-            ++weight[swc.n];
-            ++weight[swc.pn];
-        }
-    }
-
-    if(In_Block_Points.empty()) return NeuronTree();
-
-    QVector<int> Border_Points;
-    for(auto i=weight.begin();i!=weight.end();++i){
-        if(i.value()==1){
-            Border_Points.push_back(i.key());
-        }
-    }
-
-    XYZ Marker_XYZ=XYZ(startPoint);
-
-    int pick_id;
-    double mn=1e10;
-    for(const int & i:Border_Points){
-        double dis=distance_XYZ(Marker_XYZ,XYZ(mp[i]));
-        if(mn>dis){
-            mn=dis;
-            pick_id=i;
-        }
-    }
-
-    const int threshold=20;
-    if(mn>threshold) return NeuronTree();
-
-    NeuronTree Return_Tree;
-    NeuronSWC StartPoint_In_Answer=mp[pick_id];
-    StartPoint_In_Answer.n=1;
-    StartPoint_In_Answer.pn=-1;
-    Return_Tree.listNeuron.push_back(StartPoint_In_Answer);
-
-    int amount=1;
-    QQueue<std::pair<int,int> > q;
-    q.push_back(std::make_pair(-1,pick_id));    //-1 is new, pick_id is old
-    while(!q.empty()){
-        int prev=q.front().first;   //new
-        int now=q.front().second;   //old
-        q.pop_front();
-
-        NeuronSWC Add_Point=mp[now];
-        ++amount;
-        Add_Point.n = amount;
-        Add_Point.pn= prev;
-        Return_Tree.listNeuron.push_back(Add_Point);
-
-        for(const int & i:G[now]){
-            q.push_back(std::make_pair(amount,i));
-        }
-    }
-
-    return Return_Tree;
 }
 
 QString generate_apo_name(const std::string & path,const CellAPO &centerAPO){
@@ -264,7 +302,6 @@ QVector<std::pair<NeuronSWC,QQueue<XYZ> > > Find_Border(const NeuronTree & App2_
         }
     }
 
-    const double Border_Threshold=6;
     QVector<std::pair<NeuronSWC,QQueue<XYZ> > > ret;
     for(const std::pair<int,QQueue<XYZ> >  & i:border){
         const int & id=i.first;
@@ -278,10 +315,8 @@ QVector<std::pair<NeuronSWC,QQueue<XYZ> > > Find_Border(const NeuronTree & App2_
         ret.push_back(std::make_pair(mp[id],i.second));
 
     }
-    qDebug()<<"Border_Finish";
     return ret;
 }
-
 std::vector<int> Judge_Direction(const XYZ & vec){
     int weight[3][3]={{0,1,1},{1,0,1},{1,1,0}};
     double mn=1e10;
@@ -306,6 +341,9 @@ std::vector<int> Judge_Direction(const XYZ & vec){
         if(direction[i]==4 && vec.z<0)
             ++direction[i];
     }
+    for(int i=2;i>0;--i){
+        direction.push_back(direction[i]+((direction[i]&1)?-1:1 ) );
+    }
 
     return direction;
 
@@ -317,5 +355,84 @@ std::vector<int> Judge_Direction(const XYZ & vec){
     //pick=4 positive axis z
     //pick=5 negative axis z
 }
+int Find_Nearest_Id(const ImageMarker & startPoint,const QVector<NeuronSWC> & Points){
+    int mn=1e8;
+    int pick_id=-1;
+    for(const NeuronSWC & i:Points){
+        double dis=distance_XYZ(XYZ(startPoint),XYZ(i));
+        if(mn>dis){
+            mn=dis;
+            pick_id=i.n;
+        }
+    }
+    return pick_id;
+}
+NeuronTree Get_Answer_Tree(const int & origin_id,const CellAPO & centerAPO,const int & blocksize,QVector<int> & Answer_Tree_Idx){
+    NeuronTree Return_Tree;
+    int amount=0;
+    QQueue<std::pair<int,int> > q;
+    QMap<int, bool> vis;
+    q.push_back(std::make_pair(-1,origin_id));    //-1 is new, pick_id is old
+    while(!q.empty()){
+        int prev=q.front().first;   //new
+        int now=q.front().second;   //old
+        q.pop_front();
+
+        if(!In_Box(centerAPO,blocksize,Answer_Map[now])) continue;
+        Answer_Tree_Idx.push_back(now);
+        vis[now]=true;
+
+        NeuronSWC Add_Point=Answer_Map[now];
+        ++amount;
+        Add_Point.n = amount;
+        Add_Point.pn= prev;
+        Add_Point.timestamp=now;
+        Return_Tree.listNeuron.push_back(Add_Point);
+
+        for(const int & i:Answer_Graph[now]){
+            if(i>0 && !vis.count(i))
+                q.push_back(std::make_pair(amount,i));
+        }
+    }
+    return Return_Tree;
+}
+
+QVector<NeuronSWC>  Find_Extend_Marker(const int & center_id,const CellAPO & centerAPO, const int & blocksize, const NeuronTree & Answer_Tree){
+
+    QVector<NeuronSWC> Extend_Marker;
+    XYZ st;
+
+    for(const NeuronSWC & swc:Answer_Tree.listNeuron){
+        if(swc.pn==-1){
+            st=swc;
+        }
+        if(In_Box(centerAPO,blocksize,swc)){
+            for(const int & to:Answer_Graph[swc.timestamp]){
+                if(to<=0) continue;
+                const NeuronSWC & check = Answer_Map[to];
+                if(!In_Box(centerAPO, blocksize, check)){
+                    NeuronSWC Add_Point=swc;
+                    Extend_Marker.push_back(Add_Point);
+                    break;
+                }
+            }
+        }
+    }
+    if(center_id!=0){
+        int delete_id=-1;
+        double mn=1e8;
+        for(int i=0;i<Extend_Marker.size();++i){
+            double dis=distance_XYZ(XYZ(Extend_Marker[i]),st);
+            if(mn>dis){
+                mn=dis;
+                delete_id=i;
+            }
+        }
+        if(!Extend_Marker.empty() && delete_id<Extend_Marker.size() && delete_id!=-1)
+          Extend_Marker.erase(Extend_Marker.begin()+delete_id);
+    }
+    return Extend_Marker;
+}
+
 
 ```
