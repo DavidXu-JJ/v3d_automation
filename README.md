@@ -1,7 +1,37 @@
 
-# Reconstruction of neuron tree based on the app2
+# Reconstruction of neuron tree based on the app2 and ground truth data
 
-## Geometry
+Experiment code
+
+Fork from [v3d_external](https://github.com/Vaa3D/v3d_external)
+
+Build from branch [QT6_NEW](https://github.com/Vaa3D/v3d_external/tree/QT6_NEW)
+
+## Demo Image
+
+### Ground Truth Image
+
+![](./demo_image/ground_truth_1.png)
+
+![](./demo_image/ground_truth_2.png)
+
+![](./demo_image/ground_truth_3.png)
+
+### Generated Image
+
+![](./demo_image/generated_image_1.png)
+
+![](./demo_image/generated_image_2.png)
+
+![](./demo_image/generated_image_3.png)
+
+### Detailed Image
+
+![](./demo_image/generated_image_4.png)
+
+## Wheel built by myself
+
+### Geometry
 
 ```c++
 
@@ -219,7 +249,7 @@ bool has_same_vector(const V_NeuronSWC & Seg,const QVector<XYZ> & v){
 
 ```
 
-## File related
+### File related
 
 ```c++
 void Drop_NeuronSWC(const QString &path,const QList<NeuronSWC> & output){
@@ -271,7 +301,7 @@ QString generate_swc_name(const std::string & path,const CellAPO &centerAPO){
 
 ```
 
-## Border and Direction
+### Border and Direction
 
 ```c++
 
