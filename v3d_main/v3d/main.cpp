@@ -654,6 +654,67 @@ void init(const QString & Answer_File,int & soma_id){
     }
 }
 
+unsigned Get_Marker_Idx(const int & x,const int & y,const int & z,const int & blocksize){
+    return z*blocksize*blocksize+y*blocksize+x;
+}
+
+unsigned Get_Marker_Idx(const ImageMarker & startPoint,const int & blocksize){
+    return Get_Marker_Idx(startPoint.x,startPoint.y,startPoint.z,blocksize);
+}
+
+QString Remove_Irrelevant_Signal(const ImageMarker & startPoint, const int & blocksize, const QString & rawFileName){
+//    QString v3draw_File="/Users/davidxu/Downloads/thres/thres_13389.000_10460.000_3152.000.v3draw";
+    Image4DSimple p4dImage;
+    QString thresFileName=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
+    p4dImage.loadImage(thresFileName.toStdString().c_str(),true);
+    unsigned char * indata1d = p4dImage.getRawDataAtChannel(0);
+    ImagePixelType datatype = p4dImage.getDatatype();
+
+    int x = p4dImage.getXDim(), y = p4dImage.getYDim(), z = p4dImage.getZDim();
+
+    //or search in space
+    QVector<XYZ> points;
+
+    QVector<unsigned char> backup(x*y*z);
+    for(int i=0;i<p4dImage.getXDim();++i){
+        for(int j=0;j<p4dImage.getYDim();++j){
+            for(int k=0;k<p4dImage.getZDim();++k){
+                int idx=Get_Marker_Idx(i,j,k,blocksize);
+                int light=(int)(indata1d[idx]);
+                if(light>3){
+                    points.push_back(XYZ(i,j,k));
+                }
+                backup[idx]=indata1d[idx];
+                indata1d[idx]=0;
+            }
+        }
+    }
+    QVector<XYZ> output;
+    QMap<int,bool> vis;
+    QQueue<XYZ> q;
+    q.push_back(startPoint);
+    while(!q.empty()){
+        XYZ now = q.front();
+        q.pop_front();
+        for(int i=0;i<points.size();++i){
+           if(!vis[i] && distance_XYZ(now,points[i])<=2){
+              output.push_back(points[i]);
+              vis[i]=true;
+              q.push_back(XYZ(points[i]));
+           }
+        }
+    }
+    for(const XYZ & point:output){
+        int posx=(int)(point.x+eps);
+        int posy=(int)(point.y+eps);
+        int posz=(int)(point.z+eps);
+        int idx=Get_Marker_Idx(posx,posy,posz,blocksize);
+        indata1d[idx]=backup[idx];
+    }
+    p4dImage.saveImage((Work_Dir+QString("/testV3draw/trim_")+rawFileName).toStdString().c_str());
+    return Work_Dir+QString("/testV3draw/trim_")+rawFileName;
+}
+
 NeuronTree Vanilla_App2(const CellAPO & centerAPO,const ImageMarker & startPoint,const int & blocksize,const QString & rawFileName){
     //drop marker file(ok)
     QList<ImageMarker> List_Marker_Write;
@@ -801,14 +862,6 @@ NeuronTree Find_Valid_App2_Tree(const CellAPO & centerAPO,ImageMarker & startPoi
     }
 
    return ret;
-}
-
-unsigned Get_Marker_Idx(const int & x,const int & y,const int & z,const int & blocksize){
-    return z*blocksize*blocksize+y*blocksize+x;
-}
-
-unsigned Get_Marker_Idx(const ImageMarker & startPoint,const int & blocksize){
-    return Get_Marker_Idx(startPoint.x,startPoint.y,startPoint.z,blocksize);
 }
 
 struct marker_with_intensity{
@@ -1122,9 +1175,10 @@ NeuronTree Complicated_App2(const int & center_id,const CellAPO & centerAPO,Imag
                 <<"/x"<<Vaa3d_App_Path+QString("/plugins/image_thresholding/Simple_Adaptive_Thresholding/ada_threshold.dll")
                 <<"/f"<<"adath"<<"/i"<<Work_Dir+QString("/testV3draw/")+rawFileName<<"/o"<<QString(Work_Dir+QString("/testV3draw/thres_")+rawFileName));
 
+   QString v3draw = Remove_Irrelevant_Signal(startPoint,blocksize,rawFileName);
+
     ImageMarker startPointBackup=startPoint;
     if(center_id!=0){
-        QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
         std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(v3draw,startPoint,blocksize);
         for(const ImageMarker & i:possible.first){
             startPoint=i;
@@ -1165,7 +1219,6 @@ NeuronTree Complicated_App2(const int & center_id,const CellAPO & centerAPO,Imag
 
     }
     else {
-        QString v3draw=Work_Dir+QString("/testV3draw/thres_")+rawFileName;
         std::pair<QVector<ImageMarker>,QVector<ImageMarker> > possible=Get_Valid_Marker(v3draw,startPoint,blocksize);
         for(const ImageMarker & i:possible.first){
             startPoint=i;
@@ -1189,6 +1242,7 @@ NeuronTree Complicated_App2(const int & center_id,const CellAPO & centerAPO,Imag
     if(App2_Tree.listNeuron.empty())    startPoint=startPointBackup,use_answer=true;
     QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
     QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
+    QFile::remove(v3draw);
 
     return App2_Tree;
 }
