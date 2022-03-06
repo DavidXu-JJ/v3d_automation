@@ -700,7 +700,7 @@ QString Remove_Irrelevant_Signal(const ImageMarker & startPoint, const int & blo
            if(!vis[i] && distance_XYZ(now,points[i])<=2){
               output.push_back(points[i]);
               vis[i]=true;
-              q.push_back(XYZ(points[i]));
+              q.push_back(points[i]);
            }
         }
     }
@@ -1651,7 +1651,127 @@ void App2_non_recursive_DFS(const int & blocksize,const QString & File_Name){
     writeSWC_file(Work_Dir+QString("/")+File_Name,output);
 }
 
+struct SliceXY{
+    int x,y;
+    QVector<QVector<int> > mp;
+    SliceXY(int _x,int _y):x(_x),y(_y){
+        mp = QVector<QVector<int> > (x,QVector<int> (y));
+    }
+};
 
+SliceXY Get_SliceXY(unsigned char * indata1d,const int & z,const int & blocksize){
+    SliceXY ret(blocksize,blocksize);
+    for(int i=0;i<blocksize;++i)
+        for(int j=0;j<blocksize;++j){
+            ret.mp[i][j]=(int)(indata1d[Get_Marker_Idx(i,j,z,blocksize)]);
+        }
+    return ret;
+}
+
+QVector<XYZ> Summary_SliceXY(const SliceXY & slice,const int & z){
+    const int threshold = 15;
+    const int & x = slice.x;
+    const int & y = slice.y;
+    QVector<XYZ> points;
+    QVector<int> intensity;
+    for(int i=0;i<x;++i){
+        for(int j=0;j<y;++j){
+            if(slice.mp[i][j]>=threshold){
+                points.push_back(XYZ(i,j,z));
+                intensity.push_back((int)(slice.mp[i][j]));
+            }
+        }
+    }
+    QMap<int,bool> vis;
+    QVector<QVector<XYZ> > Groups;
+    QVector<QVector<int> > intensities;
+    for(int i=0;i<points.size();++i){
+        if(!vis[i]){
+            QVector<XYZ> Group;
+            QVector<int> Vec_Intensity;
+            QQueue<XYZ> q;
+            q.push_back(points[i]);
+            while(!q.empty()){
+                XYZ now = q.front();
+                q.pop_front();
+                for(int i=0;i<points.size();++i){
+                   if(!vis[i] && distance_XYZ(now,points[i])<=8){
+                      Group.push_back(points[i]);
+                      Vec_Intensity.push_back(intensity[i]);
+                      vis[i]=true;
+                      q.push_back(points[i]);
+                   }
+                }
+            }
+            Groups.push_back(Group);
+            intensities.push_back(Vec_Intensity);
+        }
+    }
+    QVector<XYZ> ret;
+    for(int k=0;k<Groups.size();++k){
+        XYZ Summary_Point(0.0);
+        int M=0;
+        for(int i=0;i<Groups[k].size();++i){
+            M += intensities[k][i];
+        }
+        for(int i=0;i<Groups[k].size();++i){
+            Summary_Point = Summary_Point + Groups[k][i]*intensities[k][i] / M;
+        }
+//        for(int i=0;i<Groups[k].size();++i){
+//            Summary_Point = Summary_Point + Groups[k][i]/Groups[k].size();
+//        }
+        Summary_Point.x=(int)(Summary_Point.x+0.5);
+        Summary_Point.y=(int)(Summary_Point.y+0.5);
+        Summary_Point.z=(int)(Summary_Point.z+0.5);
+        ret.push_back(Summary_Point);
+    }
+    return ret;
+}
+
+V_NeuronSWC_list Summary_Points(unsigned char * indata1d,const int & blocksize){
+    V_NeuronSWC_list ret;
+    const int threshold = 5;
+    QVector<XYZ> pre = Summary_SliceXY(Get_SliceXY(indata1d,0,blocksize),0);
+
+    for(int z=3;z<blocksize;z+=3){
+        QVector<XYZ> now=Summary_SliceXY(Get_SliceXY(indata1d,z,blocksize),z);
+        for(int i=0;i<pre.size();++i){
+            for(int j=0;j<now.size();++j){
+                XYZ vec = (now[j]-pre[i]);
+                double mx=std::max({abs(vec.x),abs(vec.y),abs(vec.z)});
+                vec = vec/mx;
+                int black=0;
+                for(int k=1;k<mx;++k){
+                    XYZ chk = vec*k+pre[i];
+                    if(indata1d[ Get_Marker_Idx((int)(chk.x+0.5),(int)(chk.y+0.5),(int)(chk.z+0.5),blocksize)] < threshold ){
+                        black++;
+                    }
+                }
+                if(black<=mx*0.2){
+                    V_NeuronSWC add;
+                    V_NeuronSWC_unit point1,point2;
+                    point1.x=now[j].x;
+                    point1.y=now[j].y;
+                    point1.z=now[j].z;
+                    point1.n=1;
+                    point1.type=2;
+                    point1.parent=2;
+                    point2.x=pre[i].x;
+                    point2.y=pre[i].y;
+                    point2.z=pre[i].z;
+                    point2.n=2;
+                    point2.type=2;
+                    point2.parent=-1;
+                    add.row.push_back(point1);
+                    add.row.push_back(point2);
+                    ret.seg.push_back(add);
+                }
+            }
+        }
+        pre=now;
+    }
+    return ret;
+}
 
 int main(int argc, char **argv)
 {
@@ -1681,7 +1801,17 @@ int main(int argc, char **argv)
         }
     }
 
-    App2_non_recursive_DFS(blocksize,Output_File_Name);
+    //    App2_non_recursive_DFS(blocksize,Output_File_Name);
+
+    QString v3draw_File="/Users/davidxu/Downloads/thres/thres_14649.000_10735.000_3114.000.v3draw";
+    Image4DSimple p4dImage;
+    p4dImage.loadImage(v3draw_File.toStdString().c_str(),true);
+    unsigned char * indata1d = p4dImage.getRawDataAtChannel(0);
+
+    V_NeuronSWC_list out = Summary_Points(indata1d,blocksize);
+
+    NeuronTree outtree=V_NeuronSWC_list__2__NeuronTree(out);
+    writeSWC_file("/Users/davidxu/test.eswc",outtree);
 
     qDebug()<<"finish";
 
