@@ -15,9 +15,9 @@ You will ***have to agree*** the following terms, *before* downloading/using/run
 
 2. You agree to appropriately cite this work in your related studies and publications.
 
-Peng, H., Ruan, Z., Long, F., Simpson, J.H., and Myers, E.W. (2010) �V3D enables real-time 3D visualization and quantitative analysis of large-scale biological image data sets,� Nature Biotechnology, Vol. 28, No. 4, pp. 348-353, DOI: 10.1038/nbt.1612. ( http://penglab.janelia.org/papersall/docpdf/2010_NBT_V3D.pdf )
+Peng, H., Ruan, Z., Long, F., Simpson, J.H., and Myers, E.W. (2010) “V3D enables real-time 3D visualization and quantitative analysis of large-scale biological image data sets,” Nature Biotechnology, Vol. 28, No. 4, pp. 348-353, DOI: 10.1038/nbt.1612. ( http://penglab.janelia.org/papersall/docpdf/2010_NBT_V3D.pdf )
 
-Peng, H, Ruan, Z., Atasoy, D., and Sternson, S. (2010) �Automatic reconstruction of 3D neuron structures using a graph-augmented deformable model,� Bioinformatics, Vol. 26, pp. i38-i46, 2010. ( http://penglab.janelia.org/papersall/docpdf/2010_Bioinfo_GD_ISMB2010.pdf )
+Peng, H, Ruan, Z., Atasoy, D., and Sternson, S. (2010) “Automatic reconstruction of 3D neuron structures using a graph-augmented deformable model,” Bioinformatics, Vol. 26, pp. i38-i46, 2010. ( http://penglab.janelia.org/papersall/docpdf/2010_Bioinfo_GD_ISMB2010.pdf )
 
 3. This software is provided by the copyright holders (Hanchuan Peng), Howard Hughes Medical Institute, Janelia Farm Research Campus, and contributors "as is" and any express or implied warranties, including, but not limited to, any implied warranties of merchantability, non-infringement, or fitness for a particular purpose are disclaimed. In no event shall the copyright owner, Howard Hughes Medical Institute, Janelia Farm Research Campus, or contributors be liable for any direct, indirect, incidental, special, exemplary, or consequential damages (including, but not limited to, procurement of substitute goods or services; loss of use, data, or profits; reasonable royalties; or business interruption) however caused and on any theory of liability, whether in contract, strict liability, or tort (including negligence or otherwise) arising in any way out of the use of this software, even if advised of the possibility of such damage.
 
@@ -328,7 +328,7 @@ double dot_to_line(const XYZ & cal_point,const XYZ & p1,const XYZ & p2){
     if(dm<0) return distance_XYZ(cal_point,proj);
     return std::min(distance_XYZ(cal_point,p1),distance_XYZ(cal_point,p2) );
 }
-double Distance_Unit_To_Seg(const V_NeuronSWC_unit & p, const V_NeuronSWC & s){  //??XYZ????
+double Distance_Unit_To_Seg(const V_NeuronSWC_unit & p, const V_NeuronSWC & s){  //传参XYZ可以优化
     double mn=1e8;
     XYZ check_point;
     check_point.x=p.x;check_point.y=p.y;check_point.z=p.z;
@@ -1646,7 +1646,7 @@ void App2_non_recursive_DFS(const int & blocksize,const QString & File_Name){
            //direction=3 negative axis y       dx= 0, dy=-1, dz= 0
            //direction=4 positive axis z       dx= 0, dy= 0, dz= 1
            //direction=5 negative axis z       dx= 0, dy= 0, dz=-1
-           //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(??)
+           //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
 
            ++amount;
            for(int i=0;i<1;++i){
