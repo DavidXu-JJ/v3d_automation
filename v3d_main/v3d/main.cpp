@@ -15,9 +15,9 @@ You will ***have to agree*** the following terms, *before* downloading/using/run
 
 2. You agree to appropriately cite this work in your related studies and publications.
 
-Peng, H., Ruan, Z., Long, F., Simpson, J.H., and Myers, E.W. (2010) “V3D enables real-time 3D visualization and quantitative analysis of large-scale biological image data sets,” Nature Biotechnology, Vol. 28, No. 4, pp. 348-353, DOI: 10.1038/nbt.1612. ( http://penglab.janelia.org/papersall/docpdf/2010_NBT_V3D.pdf )
+Peng, H., Ruan, Z., Long, F., Simpson, J.H., and Myers, E.W. (2010) �V3D enables real-time 3D visualization and quantitative analysis of large-scale biological image data sets,� Nature Biotechnology, Vol. 28, No. 4, pp. 348-353, DOI: 10.1038/nbt.1612. ( http://penglab.janelia.org/papersall/docpdf/2010_NBT_V3D.pdf )
 
-Peng, H, Ruan, Z., Atasoy, D., and Sternson, S. (2010) “Automatic reconstruction of 3D neuron structures using a graph-augmented deformable model,” Bioinformatics, Vol. 26, pp. i38-i46, 2010. ( http://penglab.janelia.org/papersall/docpdf/2010_Bioinfo_GD_ISMB2010.pdf )
+Peng, H, Ruan, Z., Atasoy, D., and Sternson, S. (2010) �Automatic reconstruction of 3D neuron structures using a graph-augmented deformable model,� Bioinformatics, Vol. 26, pp. i38-i46, 2010. ( http://penglab.janelia.org/papersall/docpdf/2010_Bioinfo_GD_ISMB2010.pdf )
 
 3. This software is provided by the copyright holders (Hanchuan Peng), Howard Hughes Medical Institute, Janelia Farm Research Campus, and contributors "as is" and any express or implied warranties, including, but not limited to, any implied warranties of merchantability, non-infringement, or fitness for a particular purpose are disclaimed. In no event shall the copyright owner, Howard Hughes Medical Institute, Janelia Farm Research Campus, or contributors be liable for any direct, indirect, incidental, special, exemplary, or consequential damages (including, but not limited to, procurement of substitute goods or services; loss of use, data, or profits; reasonable royalties; or business interruption) however caused and on any theory of liability, whether in contract, strict liability, or tort (including negligence or otherwise) arising in any way out of the use of this software, even if advised of the possibility of such damage.
 
@@ -178,10 +178,10 @@ void Delete_Redundant_Seg(V_NeuronSWC_list & segments){
     segments=lines;
 }
 
-QString Res_Path="Z:/TeraconvertedBrain/mouse18867_teraconvert/RES(25376x40600x11203)";
-QString Vaa3d_App_Path="C:/Users/SEU/Desktop/3.603c";
-QString Work_Dir="D:/18867_4605_x30309_y8068skip";
-QString Answer_File="D:/18867_4605_x30309_y8068skip/18867_4605_x30309_y8068.swc";
+QString Res_Path="G:/18454/RES(26298x35000x11041)";
+QString Vaa3d_App_Path="C:/3.603c";
+QString Work_Dir="G:/demo";
+QString Answer_File="G:/18454_answer/whole_image.eswc";
 QMap<int,QVector<int> > Answer_Graph;
 QMap<int,NeuronSWC> Answer_Map;
 NeuronTree Ans_Tree;
@@ -189,6 +189,7 @@ QMap<int,bool> Ans_used;
 QVector<NeuronSWC> Center_Set;
 
 int cnt=0;
+int app2_success=0;
 
 QProcess p;
 
@@ -327,7 +328,7 @@ double dot_to_line(const XYZ & cal_point,const XYZ & p1,const XYZ & p2){
     if(dm<0) return distance_XYZ(cal_point,proj);
     return std::min(distance_XYZ(cal_point,p1),distance_XYZ(cal_point,p2) );
 }
-double Distance_Unit_To_Seg(const V_NeuronSWC_unit & p, const V_NeuronSWC & s){  //传参XYZ可以优化
+double Distance_Unit_To_Seg(const V_NeuronSWC_unit & p, const V_NeuronSWC & s){  //??XYZ????
     double mn=1e8;
     XYZ check_point;
     check_point.x=p.x;check_point.y=p.y;check_point.z=p.z;
@@ -1088,6 +1089,11 @@ void Fill_Vacant_Edge(V_NeuronSWC_list & Generate){
 }
 
 NeuronTree Complicated_App2(const int & center_id,const CellAPO & centerAPO,ImageMarker & startPoint,const int & blocksize,unsigned long long  & v3draw_size,bool & use_answer,const V_NeuronSWC_list & V_Answer_Tree){
+    while(!Make_Dir(Work_Dir+QString("/APOFile")));
+    while(!Make_Dir(Work_Dir+QString("/MarkerFile")));
+    while(!Make_Dir(Work_Dir+QString("/SwcFile")));
+    while(!Make_Dir(Work_Dir+QString("/testV3draw")));
+    while(!Make_Dir(Work_Dir+QString("/EswcFile")));
     NeuronTree App2_Tree;
     //drop apo file(ok)
     QList<CellAPO> List_APO_Write;
@@ -1187,8 +1193,19 @@ NeuronTree Complicated_App2(const int & center_id,const CellAPO & centerAPO,Imag
     }
 
     if(App2_Tree.listNeuron.empty())    startPoint=startPointBackup,use_answer=true;
-    QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
-    QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
+
+    QDir dir = QDir(Work_Dir+QString("/APOFile"));
+    dir.removeRecursively();
+    dir = QDir(Work_Dir+QString("/MarkerFile"));
+    dir.removeRecursively();
+    dir = QDir(Work_Dir+QString("/SwcFile"));
+    dir.removeRecursively();
+    dir = QDir(Work_Dir+QString("/testV3draw"));
+    dir.removeRecursively();
+    dir = QDir(Work_Dir+QString("/EswcFile"));
+    dir.removeRecursively();
+//    QFile::remove(Work_Dir+QString("/testV3draw/")+rawFileName);
+//    QFile::remove(Work_Dir+QString("/testV3draw/thres_")+rawFileName);
 
     return App2_Tree;
 }
@@ -1527,7 +1544,8 @@ void App2_non_recursive_DFS(const int & blocksize,const QString & File_Name){
 
        Delete_Redundant_Seg(App2_Generate);
        NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
-       writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
+       if(!use_answer) ++app2_success;
+//       writeSWC_file(Work_Dir+"/EswcFile/"+QString(QString::fromStdString(std::to_string(++cnt)))+".eswc",output);
 
 
        //check if border is identical to last marker
@@ -1568,7 +1586,7 @@ void App2_non_recursive_DFS(const int & blocksize,const QString & File_Name){
            //direction=3 negative axis y       dx= 0, dy=-1, dz= 0
            //direction=4 positive axis z       dx= 0, dy= 0, dz= 1
            //direction=5 negative axis z       dx= 0, dy= 0, dz=-1
-           //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(面心)
+           //move the center of next bounding_box forward in the accordingly direction, make the Border_Point locates in the center of area(??)
 
            ++amount;
            for(int i=0;i<1;++i){
@@ -1595,6 +1613,14 @@ void App2_non_recursive_DFS(const int & blocksize,const QString & File_Name){
 
     NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
     writeSWC_file(Work_Dir+QString("/")+File_Name,output);
+
+    QFile file(Work_Dir+QString("/App2_Success"));
+    qDebug()<<file.open(QIODevice::WriteOnly|QIODevice::Text);
+
+    QTextStream out(&file);
+    out<<app2_success;
+    file.close();
+
 }
 
 
