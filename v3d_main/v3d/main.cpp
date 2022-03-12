@@ -1250,6 +1250,66 @@ V_NeuronSWC Link_Tree(const NeuronTree & t1,const NeuronTree & t2,const bool & p
     return ret;
 }
 
+double Max_Length(const NeuronTree & tree, const int & color){
+    QVector<double> len;
+    QVector<XYZ> head,tail;
+    for(int i=0;i<tree.listNeuron.size();++i){
+        if(tree.listNeuron[i].type!=color) continue;
+        if(tree.listNeuron[i].parent==-1) continue;
+        int pn = tree.listNeuron[i].pn;
+        XYZ p1=tree.listNeuron[i], p2=tree.listNeuron[pn-1];
+        bool insert=false;
+        if(head.empty()){
+            insert=true;
+        }
+        if(!insert){
+           bool trigger=false;
+           for(int j=0;j<head.length();++j){
+               const XYZ & cmp1=head[j];
+               const XYZ & cmp2=tail[j];
+               if(XYZ_eq(cmp1,p1)){
+                   head[j]=p2;
+                   len[j]+=distance_XYZ(p1,p2);
+                   trigger=true;
+                   break;
+               }
+               if(XYZ_eq(cmp1,p2)){
+                   head[j]=p1;
+                   len[j]+=distance_XYZ(p1,p2);
+                   trigger=true;
+                   break;
+               }
+               if(XYZ_eq(cmp2,p1)){
+                   tail[j]=p2;
+                   len[j]+=distance_XYZ(p1,p2);
+                   trigger=true;
+                   break;
+               }
+               if(XYZ_eq(cmp2,p2)){
+                   tail[j]=p1;
+                   len[j]+=distance_XYZ(p1,p2);
+                   trigger=true;
+                   break;
+               }
+           }
+           if(!trigger){
+              insert=true;
+           }
+        }
+
+        if(insert){
+            head.push_back(p1);
+            tail.push_back(p2);
+            len.push_back(distance_XYZ(p1, p2));
+        }
+    }
+    double mx = -1e8;
+    for(int i=0;i<len.length();++i){
+       mx=std::max(mx,len[i]);
+    }
+    return mx;
+}
+
 void App2_non_recursive_DFS(const int & blocksize,const QString & File_Name){
 
     int soma_id=-1;
@@ -1614,13 +1674,19 @@ void App2_non_recursive_DFS(const int & blocksize,const QString & File_Name){
     NeuronTree output=V_NeuronSWC_list__2__NeuronTree(App2_Generate);
     writeSWC_file(Work_Dir+QString("/")+File_Name,output);
 
-    QFile file(Work_Dir+QString("/App2_Success"));
-    qDebug()<<file.open(QIODevice::WriteOnly|QIODevice::Text);
+    QFile file1(Work_Dir+QString("/App2_Success"));
+    qDebug()<<file1.open(QIODevice::WriteOnly|QIODevice::Text);
 
-    QTextStream out(&file);
-    out<<app2_success;
-    file.close();
+    QTextStream out1(&file1);
+    out1<<app2_success;
+    file1.close();
 
+    QFile file2(Work_Dir+QString("/Max_App2_Length"));
+    qDebug()<<file2.open(QIODevice::WriteOnly|QIODevice::Text);
+
+    QTextStream out2(&file2);
+    out2<<Max_Length(output,2);
+    file2.close();
 }
 
 
