@@ -33,6 +33,12 @@ Build from branch [QT6_NEW](https://github.com/Vaa3D/v3d_external/tree/QT6_NEW)
 
 ![](./demo_image/generated_image_4.png)
 
+### Generating Process
+
+![](./demo_image/1.gif)
+
+![](./demo_image/2.gif)
+
 ## Wheel built by myself
 
 ### Geometry
