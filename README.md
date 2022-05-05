@@ -9,9 +9,7 @@ Build from branch [QT6_NEW](https://github.com/Vaa3D/v3d_external/tree/QT6_NEW)
 
 ## Expand Process
 
-![](./demo_image/expand_process_1.png)
-
-![](./demo_image/expand_process_2.png)
+![](./demo_image/expand_process_3.png)
 
 ## Demo Image
 
