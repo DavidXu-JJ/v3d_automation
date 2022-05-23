@@ -9,7 +9,11 @@ Build from branch [QT6_NEW](https://github.com/Vaa3D/v3d_external/tree/QT6_NEW)
 
 ## Expand Process
 
+Employ [APP2](https://www.researchgate.net/publication/236252006_APP2_Automatic_Tracing_of_3D_Neuron_Morphology_Based_on_Hierarchical_Pruning_of_Gray-Weighted_Image_Distance-Trees) in a small block of 128x128x128, expand the reconstruction tree to the whole single cell among the whole brain 3D space, which is about $10^{13}$ pixels large.
+
 ![](./demo_image/expand_process_3.png)
+
+In generated image, the accurate part of the tree will be remained and labeled as red line. The blue part is ground truch data.
 
 ## Demo Image
 
