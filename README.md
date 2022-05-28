@@ -4,7 +4,7 @@
       * [Ground Truth Image](#ground-truth-image)
       * [Generated Image](#generated-image)
       * [Detailed Image](#detailed-image)
-      * [Generating Process(with GIF)](#generating-processgif)
+      * [Generating Process(with GIF)](#generating-processwith-gif)
    * [Wheel built by myself](#wheel-built-by-myself)
       * [Geometry](#geometry)
       * [File related](#file-related)
